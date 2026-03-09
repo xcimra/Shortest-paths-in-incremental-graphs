@@ -481,13 +481,13 @@ window.doupdate = doupdate;
     document.getElementById('end').value
     )"> Cesta</button>
 <div>
-  <input type="text" id="v" placeholder="vrchol">
-  <input type="text" id="win" placeholder="hrany vychadzajuce z vrcholu">
-  <input type="text" id="wout" placeholder="hrany vchadzajuce do vrcholu ">
+  <input type="text" id="v"  placeholder="vrchol">
+  <input type="text" id="win" style="width:185px" placeholder="hrany vychadzajuce z vrcholu">
+  <input type="text" id="wout" style="width:185px" placeholder="hrany vchadzajuce do vrcholu ">
   <button onclick="doupdate(
         document.getElementById('v').value,
         document.getElementById('win').value,
         document.getElementById('wout').value,
     )"> aktualizacia vrcholu</button>
-    <h1 style="font-size: 16px; font-weight: normal; margin: 0;"> vrcholy pri aktualizácií sú oddelené čiarkou a nekonečno je zadané inf napr. 1, inf, 0</h1>
+    <h1 style="font-size: 16px; font-weight: normal; margin: 0;"> hrany vchadzajúce do vrcholu a vychádzajúce z vrcholu pri aktualizácií sú oddelené čiarkou a nekonečno je zadané inf napr. 1, inf, 0</h1>
 </div>
