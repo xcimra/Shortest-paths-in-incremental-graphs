@@ -7,6 +7,8 @@
 <script type="module">
     let graph;
     let cy;
+    let ctr = 0;
+    let node1;
 import { MinPriorityQueue } from 'https://cdn.skypack.dev/@datastructures-js/priority-queue';
    class Path {
       constructor(start, end) {
@@ -338,7 +340,15 @@ for (let i = 1; i <= numVertices; i++) {
         "text-background-opacity": 1,
         "text-background-padding": "2px"
     }
-      }
+    
+      },
+      {
+  selector: '.clicked',
+  style: {
+    'border-color': 'green',
+    'border-width': 3
+  }
+}
     ],
 
     layout: {
@@ -347,14 +357,61 @@ for (let i = 1; i <= numVertices; i++) {
   });
 
   // click interaction
-  cy.on('tap', 'node', function (evt) {
-    alert('Clicked ' + evt.target.id());
-  });}
+cy.on('tap', 'node', function (evt) {
+
+  const node = evt.target;
+    if (ctr <1){
+        node1 = parseInt(node.id());
+        ctr++;
+        // highlight clicked node
+        node.addClass('clicked');
+    }
+    else{
+        // remove highlight from all nodes
+        cy.nodes().removeClass('clicked');
+          
+          let whole = `P{${node1},${parseInt(node.id())}} obsahuje cesty:`;
+          let current = graph.p_list[node1-1][parseInt(node.id())-1];
+          const Q = [];
+        while (!current.isEmpty()){
+            
+            let path = current.dequeue();
+            console.log("start");
+            console.log(path);
+            Q.push(path)
+            let pathstring = `{ ${path.start+1}`;
+
+            pathstring = _parsepath(path,pathstring);
+            pathstring += "},";
+            whole += pathstring;
+        }
+        for (let i = 0;i<Q.length;i++){
+            current.enqueue(Q[i]);
+        }
+        alert(whole);
+
+
+        ctr = 0;
+    }
+  
+}
+);}
     function getdistance(x,y){
         x = parseInt(x)-1;
         y = parseInt(y)-1;
         let result = graph.distance(x, y)
         alert(`Vzdialenosť medzi vrcholmi ${x+1} a ${y+1} je ${result == Infinity?"nekonečno":result}.` );
+    }
+    function _parsepath(result,startstring){
+        let pathstring = startstring
+        
+        while (result.r != null)
+        {
+            result = result.r
+            console.log(result);
+            pathstring += `,${result.start+1}`
+        }
+        return pathstring;
     }
     function getpath(x,y){
         x = parseInt(x)-1;
@@ -365,11 +422,7 @@ for (let i = 1; i <= numVertices; i++) {
             return
         }
         let pathstring = `Cesta obsahuje vrcholy: ${result.start+1}`
-        while (result.l != null)
-        {
-            result = result.l
-            pathstring += `,${result.start+1}`
-        }
+        pathstring = _parsepath(result,pathstring);
         alert(pathstring +"." );
     }
 function updateCytoscapeEdges() {
