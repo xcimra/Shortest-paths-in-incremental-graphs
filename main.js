@@ -42,34 +42,37 @@ target: (path.end + 1).toString()
 
 }
 }
-
+const nodeSize = Math.max(20, 120 / Math.sqrt(numVertices));
+const fontSize = Math.max(10, nodeSize / 2);
 cy = cytoscape({
 container: document.getElementById("cy"),
 elements: elements,
 
 style: [
 {
-selector: "node",
-style: {
-"background-color": "#0074D9",
-"label": "data(label)",
-"color": "#fff",
-"text-valign": "center",
-"text-halign": "center"
-}
+  selector: "node",
+  style: {
+    "background-color": "#0074D9",
+    "label": "data(label)",
+    "color": "#fff",
+    "text-valign": "center",
+    "text-halign": "center",
+    "width": nodeSize,
+    "height": nodeSize,
+    "font-size": fontSize
+  }
 },
-
 {
-selector: "edge",
-style: {
+  selector: "edge",
+  style: {
     "curve-style": "bezier",
     "target-arrow-shape": "triangle",
     "label": "data(weight)",
-    "font-size": "14px",
+    "font-size": Math.max(8, fontSize * 0.8),
     "text-background-color": "white",
     "text-background-opacity": 1,
     "text-background-padding": "2px"
-}
+  }
 },
 {
   selector: '.clicked',
@@ -226,3 +229,9 @@ window.showName = showName;
 window.getdistance = getdistance;
 window.getpath = getpath;
 window.doupdate = doupdate;
+window.addEventListener("resize", () => {
+  if (cy) {
+    cy.resize();
+    cy.fit();
+  }
+});
