@@ -18,6 +18,8 @@
 <input type="number" id="start" placeholder="Začiatok">
 <input type="number" id="end" placeholder="Koniec">
 
+
+
 <button onclick="getdistance(
     document.getElementById('start').value,
     document.getElementById('end').value
@@ -28,7 +30,7 @@
     document.getElementById('end').value
 )">Cesta</button>
 
-<div>
+<div id = "vectorInputs">
 <input type="text" id="v" placeholder="vrchol">
 <input type="text" id="win" style="width:185px" placeholder="hrany vychadzajuce z vrcholu">
 <input type="text" id="wout" style="width:185px" placeholder="hrany vchadzajuce do vrcholu">
@@ -39,12 +41,37 @@
     document.getElementById('wout').value
 )">aktualizacia vrcholu</button>
 
+
 <h1 style="font-size:16px;font-weight:normal;margin:0;">
 hrany vchadzajúce do vrcholu a vychádzajúce z vrcholu pri aktualizácií sú oddelené čiarkou
 a nekonečno je zadané inf napr. 1, inf, 0
 </h1>
 </div>
 
+<div id = "edgeInputs" style="display: none;">
+<input type="text" id="v" placeholder="počiatočný vrchol">
+<input type="text" id="u" placeholder="konečný vrchol">
+<input type="text" id="wout" style="width:185px" placeholder="velkosť hrany">
+
+<button onclick="doupdate(
+    document.getElementById('v').value,
+    document.getElementById('win').value,
+    document.getElementById('wout').value
+)">aktualizacia vrcholu</button>
+
+
+<h1 style="font-size:16px;font-weight:normal;margin:0;">
+hrany vchadzajúce do vrcholu a vychádzajúce z vrcholu pri aktualizácií sú oddelené čiarkou
+a nekonečno je zadané inf napr. 1, inf, 0
+</h1>
+</div>
+<label>
+  <input type="radio" name="inputType" value="hrana" > Hrana
+</label>
+
+<label>
+  <input type="radio" name="inputType" value="vektor" checked> Vektor
+</label>
 <script type="module" src="./main.js"></script>
 
 </body>
