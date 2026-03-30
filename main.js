@@ -285,6 +285,12 @@ function getdistance(x, y) {
   }
   x = parseInt(x) - 1;
   y = parseInt(y) - 1;
+  if ((isNaN(x) || x == null || x >=numVertices || x <0 ) ||(isNaN(y) || y == null || y >=numVertices || y <0 ))
+  {
+    alert("vyplnte správne začiatočný a koncový vrchol");
+    return;
+  }
+
 
   let result = graph.distance(x, y);
 
@@ -294,13 +300,22 @@ function getdistance(x, y) {
 }
 
 function getpath(x, y) {
+
   if (graph == null)
   {
     alert("zadajte najprv počet vrcholov");
     return;
   }
+  
   x = parseInt(x) - 1;
   y = parseInt(y) - 1;
+  if ((isNaN(x) || x == null || x >=numVertices || x <0 ) ||(isNaN(y) || y == null || y >=numVertices || y <0 ))
+  {
+      console.log("yes");
+    alert("vyplnte správne začiatočný a koncový vrchol");
+    return;
+  }
+
 
   let result = graph.path(x, y);
 
