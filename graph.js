@@ -115,6 +115,7 @@ export class Graph {
 
       if (w_vu < Infinity) {
         console.log("weight_from " + v, u);
+        
         let path = new Path(v, u);
         path.weight = w_vu;
         path.l = this.p_list[v][v].front();
@@ -123,6 +124,7 @@ export class Graph {
 
         path.r?.L.push(path);
         path.l?.R.push(path);
+        console.log(path);
       }
     }
 
@@ -157,7 +159,7 @@ export class Graph {
     for (const P_list of this.p_list) {
       for (const P of P_list) {
         if (!P || P.isEmpty()) continue;
-        console.log(P.front(), P.front().weight);
+
         H.enqueue(P.front());
       }
     }
@@ -177,15 +179,18 @@ export class Graph {
 
       visited[path_xy.start][path_xy.end] = true;
       if (this.p_star_list[path_xy.start][path_xy.end].front() == null) {
+        console.log ("step3");
         //console.log(this.p_star_list[path_xy.start][path_xy.end].front());
 
         console.log(path_xy);
+        console.log(this.p_star_list[path_xy.start][path_xy.end]);
         this.p_star_list[path_xy.start][path_xy.end].enqueue(path_xy);
 
         path_xy.l?.R_star?.push(path_xy);
         path_xy.r?.L_star?.push(path_xy);
 
         for (const path_new_xb of path_xy.l?.L_star || []) {
+          console.log ("has l");
           let path_new_xy = new Path(path_new_xb.start, path_xy.end);
 
           path_new_xy.weight =
@@ -204,8 +209,9 @@ export class Graph {
         }
 
         for (const path_a_new_y of path_xy.r?.R_star || []) {
+          console.log ("has r");
           let path_x_new_y = new Path(path_xy.start, path_a_new_y.end);
-
+          
           path_x_new_y.weight =
             this.p_list[path_xy.end][path_a_new_y.end].front().weight +
             path_xy.weight;
@@ -213,7 +219,7 @@ export class Graph {
           path_x_new_y.l = path_xy;
           path_x_new_y.r = path_a_new_y;
 
-          this.p_list[path_a_new_y.start][path_a_new_y.end].enqueue(
+          this.p_list[path_x_new_y.start][path_x_new_y.end].enqueue(
             path_x_new_y,
           );
 
@@ -227,6 +233,7 @@ export class Graph {
   }
 
   update(v, w) {
+    console.log(w);
     this.cleanup(v);
     this.fixup(v, w);
   }

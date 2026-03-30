@@ -1,16 +1,165 @@
 import { Graph } from "./graph.js";
 
-let graph;
+let graph = null;
 let cy;
 let ctr = 0;
 let node1;
+let numVertices;
+let queueMode;
+function addPaths(paths, id) {
+  const panel = document.getElementById("panel");
 
+  const card = document.createElement("div");
+  card.className = "card";
+  card.id = "card-" + id;
+
+  card.innerHTML = `<h3>Prioritný rad ${id}</h3>`;
+
+  paths.forEach(path => {
+    let pathstring = "{ " + (path.start + 1);
+    pathstring = _parsepath(path, pathstring);
+    pathstring += "}";
+
+    const button = document.createElement("button");
+    button.textContent = pathstring;
+
+    const left =
+      path.l == null
+        ? "žiadna"
+        : _parsepath(path.l, (path.l.start + 1).toString() + ",");
+
+    const right =
+      path.r == null
+        ? "žiadna"
+        : _parsepath(path.r, (path.r.start + 1).toString() + ",");
+
+    const L = path.L?.map(p =>
+      _parsepath(p, "{ " + (p.start + 1).toString()) + "}"
+    ).join(", ") || "žiadna";
+
+    const R = path.R?.map(p =>
+      _parsepath(p, "{ " + (p.start + 1).toString()) + "}"
+    ).join(", ") || "žiadna";
+
+    const L_star = path.L_star?.map(p =>
+      _parsepath(p, "{ " + (p.start + 1).toString()) + "}"
+    ).join(", ") || "žiadna";
+
+    const R_star = path.R_star?.map(p =>
+      _parsepath(p, "{ " + (p.start + 1).toString()) + "}"
+    ).join(", ") || "žiadna";
+
+    button.onclick = () => {
+      alert(
+        `cesta: ${pathstring}\n` +
+        `váha: ${path.weight}\n` +
+        `l: ${left}\n` +
+        `r: ${right}\n` +
+        `L: ${L}\n` +
+        `R: ${R}\n` +
+        `L*: ${L_star}\n` +
+        `R*: ${R_star}`
+      );
+    };
+
+    card.appendChild(button);
+  });
+
+  panel.appendChild(card);
+}
+function createRadioButtons() {
+  const panel = document.getElementById("panel");
+
+  const controls = document.createElement("div");
+  controls.id = "controls";
+
+  // Radio 1
+  const labelL = document.createElement("label");
+  const radioL = document.createElement("input");
+  radioL.type = "radio";
+  radioL.name = "mode1";
+  radioL.value = "NonL";
+
+  radioL.addEventListener("change", function () {
+    queueMode = this.value;
+    resetShortestQueues();
+  });
+
+  labelL.appendChild(radioL);
+  labelL.appendChild(document.createTextNode(" Najkratšie cesty"));
+
+  // Radio 2
+  const labelR = document.createElement("label");
+  const radioR = document.createElement("input");
+  radioR.type = "radio";
+  radioR.name = "mode1";
+  radioR.value = "L";
+
+  radioR.addEventListener("change", function () {
+    queueMode = this.value;
+    resetLocallyShortestQueues();
+  });
+
+  labelR.appendChild(radioR);
+  labelR.appendChild(document.createTextNode(" Lokálne najkratšie cesty"));
+
+  controls.appendChild(labelL);
+  controls.appendChild(labelR);
+
+  panel.appendChild(controls);
+}
+function resetShortestQueues(){
+  document.getElementById("panel").innerHTML = "";
+  createRadioButtons();
+  for (let i = 0; i < graph.V; i++){
+    for (let j = 0; j < graph.V; j++){
+      let path =graph.p_list[i][j].front();
+      if (path != null){
+        addPaths([path], (i+1).toString()+", "+(j+1).toString());
+      }
+
+    }
+  }
+
+}
+function resetLocallyShortestQueues(){
+  document.getElementById("panel").innerHTML = "";
+  createRadioButtons();
+  for (let i = 0; i < graph.V; i++){
+    for (let j = 0; j < graph.V; j++){
+      let current = graph.p_list[i][j];
+      let whole = "cesty: "
+      const Q = [];
+
+      while (!current.isEmpty()) {
+        let path = current.dequeue();
+
+        Q.push(path);
+
+        let pathstring = `{ ${path.start + 1}`;
+        pathstring = _parsepath(path, pathstring);
+        pathstring += "},";
+
+        whole += pathstring;
+        
+      }
+      if (Q.length != 0 || i == j){
+        addPaths(Q, (i+1).toString()+", "+(j+1).toString());
+      }
+
+      console.log(i,j,Q);
+      for (let i = 0; i < Q.length; i++) current.enqueue(Q[i]);
+    }
+  }
+}
 function showName() {
-  let numVertices = parseInt(document.getElementById("nameInput").value);
+  numVertices = parseInt(document.getElementById("nameInput").value);
 
   const elements = [];
 
   graph = new Graph(numVertices);
+
+  resetShortestQueues();
 
   for (let i = 1; i <= numVertices; i++) {
     elements.push({
@@ -129,7 +278,11 @@ function _parsepath(result, startstring) {
 }
 
 function getdistance(x, y) {
-  alert("yes");
+  if (graph == null)
+  {
+    alert("zadajte najprv počet vrcholov");
+    return;
+  }
   x = parseInt(x) - 1;
   y = parseInt(y) - 1;
 
@@ -141,6 +294,11 @@ function getdistance(x, y) {
 }
 
 function getpath(x, y) {
+  if (graph == null)
+  {
+    alert("zadajte najprv počet vrcholov");
+    return;
+  }
   x = parseInt(x) - 1;
   y = parseInt(y) - 1;
 
@@ -159,18 +317,49 @@ function getpath(x, y) {
 }
 
 function doupdate(v, win, wout) {
+  if (graph == null)
+  {
+    alert("zadajte najprv počet vrcholov");
+    return;
+  }
   const selected = document.querySelector('input[name="inputType"]:checked');
 
 
-  v = parseInt(v) - 1;
+  const v_start = parseInt(v) - 1;
+  let w;
+  console.log(currentMode);
+  if (currentMode == "hrana"){
+  const resultIn = Array(numVertices).fill(Infinity);
+  console.log(resultIn);
+  win.split(",").forEach(pair => {
+    const [v, h] = pair.trim().split(":");
+    resultIn[Number(v)-1] = Number(h);
+  });
+  if (resultIn[v_start] == Infinity){
+    resultIn[v_start] = 0;
+  }
+  const resultOut = Array(numVertices).fill(Infinity);;
 
-  let w = [
-    win.split(",").map((x) => (x.trim() == "inf" ? Infinity : Number(x))),
-    wout.split(",").map((x) => (x.trim() == "inf" ? Infinity : Number(x))),
-  ];
+  wout.split(",").forEach(pair => {
+    const [v, h] = pair.trim().split(":");
+    resultOut[Number(v)-1] = Number(h);
+  });
+  w = [resultIn,resultOut];
+  if (resultOut[v_start] == Infinity){
+    resultOut[v_start] = 0;
+  }
+  }
+  else{
+    w = [
+      win.split(",").map((x) => (x.trim() == "inf" ? Infinity : Number(x))),
+      wout.split(",").map((x) => (x.trim() == "inf" ? Infinity : Number(x))),
+    ];
+  }
+  console.log(w);
+  console.log(v_start);
+  graph.update(v_start, w);
 
-  graph.update(v, w);
-
+  resetShortestQueues();
   updateCytoscapeEdges();
 }
 
@@ -215,10 +404,16 @@ window.addEventListener("resize", () => {
 let currentMode = null;
 
 window.addEventListener("DOMContentLoaded", () => {
+
   const vectorDiv = document.getElementById("vectorInputs");
   const edgeDiv = document.getElementById("edgeInputs");
   document.querySelectorAll('input[name="inputType"]').forEach(radio => {
     radio.addEventListener("change", function () {
+      if (graph == null)
+      {
+        alert("zadajte najprv počet vrcholov");
+        return;
+      }
       currentMode = this.value;
       if (currentMode === "hrana") 
       {
@@ -230,6 +425,27 @@ window.addEventListener("DOMContentLoaded", () => {
         vectorDiv.style.display = "block";
       }
       //alert(currentMode);
+    });
+  });
+});
+window.addEventListener("DOMContentLoaded", () => {
+
+  document.querySelectorAll('input[name="mode1"]').forEach(radio => {
+    radio.addEventListener("change", function () {
+      if (graph == null)
+      {
+        alert("zadajte najprv počet vrcholov");
+        return;
+      }
+      queueMode = this.value;
+      console.log(queueMode);
+      console.log('queueMode');
+      if (queueMode === "L") {
+        resetLocallyShortestQueues();
+      } else {
+        resetShortestQueues();
+
+      }
     });
   });
 });
