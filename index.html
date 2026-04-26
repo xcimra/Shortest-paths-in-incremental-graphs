@@ -10,70 +10,87 @@
 </head>
 
 <body>
-
-<div id="cy" style="width: 60vh; height: 40vh; margin-left: 50vh; border: 1vh solid #ccc;"></div>
-<div style="margin-left: 48vh;">
-<input type="number" id="nameInput" placeholder="Zadaj počet vrcholov grafu:">
-<button onclick="showName()">OK</button>
-
-<input type="number" id="start" placeholder="Začiatok">
-<input type="number" id="end" placeholder="Koniec">
-
-
-
-<button onclick="getdistance(
-    document.getElementById('start').value,
-    document.getElementById('end').value
-)">Vzdialenosť</button>
-
-<button onclick="getpath(
-    document.getElementById('start').value,
-    document.getElementById('end').value
-)">Cesta</button>
+<div>
+    <div>
+        <div class="editor">
+        <div class="line-numbers" id="lines"></div>
+        <div class="code" id="code"></div>
+        <div class="cursor" id="cursor">➤</div>
+    </div>
+    <div style="display: flex;">
+        <button onclick="nextStep()">Next</button>
+        <button onclick="beforeStep()">Before</button>
+    </div>
 </div>
-<div id = "vectorInputs" style="margin-left: 48vh;">
-<input type="text" id="v" placeholder="vrchol">
-<input type="text" id="win" style="width:185px" placeholder="hrany vychadzajuce z vrcholu">
-<input type="text" id="wout" style="width:185px" placeholder="hrany vchadzajuce do vrcholu">
-
-<button onclick="doupdate(
-    document.getElementById('v').value,
-    document.getElementById('win').value,
-    document.getElementById('wout').value
-)">aktualizacia vrcholu</button>
-
-
 
 </div>
 
-<div id = "edgeInputs" style="display: none; margin-left: 40vh;">
-<input type="text" id="v_edge" placeholder="aktualizovaný vrchol">
-<input type="text" id="win_edge" placeholder="cielove vrcholy vo formate v1:h1,v2:h2" style="width: 40ch;">
-<input type="text" id="wout_edge" placeholder="zdrojové vrcholy vo formate v1:h1,v2:h2" style="width: 40ch;">
-<button onclick="doupdate(
-    document.getElementById('v_edge').value,
-    document.getElementById('win_edge').value,
-    document.getElementById('wout_edge').value
-)">aktualizacia vrcholu</button>
+
+    <div>
+        <div id="cy" style="width: 60vh; height: 40vh; margin-left: 10vh;margin-right: 30vh; border: 1vh solid #ccc;"></div>
+        <div style="margin-left: 8vh;">
+        <input type="number" id="nameInput" placeholder="Zadaj počet vrcholov grafu:">
+        <button onclick="showName()">OK</button>
+
+        <input type="number" id="start" placeholder="Začiatok">
+        <input type="number" id="end" placeholder="Koniec">
 
 
-<h1 style="font-size:16px;font-weight:normal;margin:0;">
 
-</h1>
-</div>
-<div style="margin-left: 70vh;">
-<label>
-  <input type="radio" name="inputType" value="hrana"> Hrana
-</label>
+        <button onclick="getdistance(
+            document.getElementById('start').value,
+            document.getElementById('end').value
+        )">Vzdialenosť</button>
 
-<label>
-  <input type="radio" name="inputType" value="vektor" checked > Vektor
-</label>
-</div>
-<script type="module" src="./main.js"></script>
-<div class="side-panel" id="panel">
-    <label><input type="radio" name="mode1" value="L"> Najkratšie cesty</label>
-    <label><input type="radio" name="mode1" value="NonL"> Lokálne najkratšie cesty</label>
-</div>
+        <button onclick="getpath(
+            document.getElementById('start').value,
+            document.getElementById('end').value
+        )">Cesta</button>
+        </div>
+        <div id = "vectorInputs" style="margin-left: 8vh;">
+        <input type="text" id="v" placeholder="vrchol">
+        <input type="text" id="win" style="width:185px" placeholder="hrany vychadzajuce z vrcholu">
+        <input type="text" id="wout" style="width:185px" placeholder="hrany vchadzajuce do vrcholu">
+
+        <button onclick="doupdate(
+            document.getElementById('v').value,
+            document.getElementById('win').value,
+            document.getElementById('wout').value
+        )">aktualizacia vrcholu</button>
+
+
+
+        </div>
+
+        <div id = "edgeInputs" style="display: none; margin-left: 2vh;">
+        <input type="text" id="v_edge" placeholder="aktualizovaný vrchol">
+        <input type="text" id="win_edge" placeholder="cielove vrcholy vo formate v1:h1,v2:h2" style="width: 40ch;">
+        <input type="text" id="wout_edge" placeholder="zdrojové vrcholy vo formate v1:h1,v2:h2" style="width: 40ch;">
+        <button onclick="doupdate(
+            document.getElementById('v_edge').value,
+            document.getElementById('win_edge').value,
+            document.getElementById('wout_edge').value
+        )">aktualizacia vrcholu</button>
+
+
+        <h1 style="font-size:16px;font-weight:normal;margin:0;">
+
+        </h1>
+        </div>
+        <div style="margin-left: 30vh;">
+        <label>
+        <input type="radio" name="inputType" value="hrana"> Hrana
+        </label>
+
+        <label>
+        <input type="radio" name="inputType" value="vektor" checked > Vektor
+        </label>
+        </div>
+    </div>
+    <script type="module" src="./main.js"></script>
+    <div class="side-panel" id="panel">
+        <label><input type="radio" name="mode1" value="L"> Najkratšie cesty</label>
+        <label><input type="radio" name="mode1" value="NonL"> Lokálne najkratšie cesty</label>
+    </div>
 </body>
 </html>

@@ -1,17 +1,55 @@
 .side-panel {
-  position: fixed;
   right: 0;
   top: 0;
-  width: 250px;
+  min-width: 250px;
   height: 100vh;
-  overflow-y: auto;
-  border-left: 1px solid #ccc;
-  padding: 10px;
-}
 
+  border-left: 1px solid #ccc;
+  border-right: 1px solid #ccc;
+  padding: 10px;
+
+}
+body {
+
+  display: flex;
+}
 .card {
   border: 1px solid #999;
   padding: 10px;
+  min-width: 200px;
   margin-bottom: 10px;
   border-radius: 8px;
+}
+.editor {
+  position: relative;
+  display: flex;
+  font-family: monospace;
+  border: 1px solid #ccc;
+  width: 400px;
+  padding: 8px 0;
+}
+
+.code {
+  position: relative;
+  flex: 1;
+}
+
+.line {
+  height: 20px;
+  padding-left: 14px;
+  white-space: pre; /* IMPORTANT */
+  line-height: 20px; /* 🔥 ensures vertical alignment */
+}
+.line-numbers {
+  height: 20px;
+  margin-bottom: 10px;
+  line-height: 20px; /* 🔥 ensures vertical alignment */
+}
+.cursor {
+  position: absolute;
+
+  top: 10px;
+  padding-left: 10px;
+  font-size: 14px;
+  transition: top 0.2s ease, left 0.2s ease;
 }

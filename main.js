@@ -1,11 +1,22 @@
 import { Graph } from "./graph.js";
-
+import { initEditor, nextStep,addCodeLine,beforeStep } from "./editor.js";
 let graph = null;
 let cy;
 let ctr = 0;
 let node1;
 let numVertices;
 let queueMode;
+
+
+
+window.addEventListener("DOMContentLoaded", () => {
+  initEditor();
+
+  // 🔥 expose to HTML
+  window.nextStep = nextStep;
+  window.beforeStep = beforeStep;
+});
+
 function addPaths(paths, id) {
   const panel = document.getElementById("panel");
 
@@ -154,10 +165,15 @@ function resetLocallyShortestQueues(){
 }
 function showName() {
   numVertices = parseInt(document.getElementById("nameInput").value);
-
+  if (isNaN(numVertices))
+  {
+    alert("zadajte spravne cislo");
+    return;
+  }
+  console.log(numVertices);
   const elements = [];
 
-  graph = new Graph(numVertices);
+  graph = new Graph(numVertices,addCodeLine);
 
   resetShortestQueues();
 
@@ -259,7 +275,13 @@ function showName() {
 
       for (let i = 0; i < Q.length; i++) current.enqueue(Q[i]);
 
-      alert(whole);
+      let weight = prompt(`Zadajte dľžku hrany:${node1},${node.id()}`);
+      win = `${node.id()}:${weight}`
+      wout = ""
+      const before = currentMode;
+      currentMode = "hrana"
+      doupdate(node1, win, wout);
+      currentMode = before
 
       ctr = 0;
     }
@@ -291,7 +313,7 @@ function getdistance(x, y) {
     return;
   }
 
-
+  
   let result = graph.distance(x, y);
 
   alert(
@@ -337,15 +359,32 @@ function doupdate(v, win, wout) {
     alert("zadajte najprv počet vrcholov");
     return;
   }
+
   const selected = document.querySelector('input[name="inputType"]:checked');
 
 
   const v_start = parseInt(v) - 1;
+  if (isNaN(v_start))
+  {
+    alert("zadajte spravne meno vrcholu");
+    return;
+  }
   let w;
   console.log(currentMode);
   if (currentMode == "hrana"){
-  const resultIn = Array(numVertices).fill(Infinity);
-  console.log(resultIn);
+const resultIn = Array(numVertices).fill(Infinity);
+const resultOut = Array(numVertices).fill(Infinity);
+
+// load CURRENT graph values
+for (let i = 0; i < numVertices; i++) {
+  if (!graph.p_list[v_start][i].isEmpty()) {
+    resultIn[i] = graph.p_list[v_start][i].front().weight;
+  }
+
+  if (!graph.p_list[i][v_start].isEmpty()) {
+    resultOut[i] = graph.p_list[i][v_start].front().weight;
+  }
+}
   win.split(",").forEach(pair => {
     const [v, h] = pair.trim().split(":");
     resultIn[Number(v)-1] = Number(h);
@@ -353,7 +392,7 @@ function doupdate(v, win, wout) {
   if (resultIn[v_start] == Infinity){
     resultIn[v_start] = 0;
   }
-  const resultOut = Array(numVertices).fill(Infinity);;
+
 
   wout.split(",").forEach(pair => {
     const [v, h] = pair.trim().split(":");
