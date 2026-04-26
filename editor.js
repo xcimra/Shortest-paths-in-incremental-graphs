@@ -1,9 +1,7 @@
 // editor.js
 
 const codeLines = [
-  "x = 5",
-  "y = x + 1",
-  "print(y)"
+
 ];
 const history = []
 // internal state

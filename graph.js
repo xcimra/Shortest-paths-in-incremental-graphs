@@ -99,7 +99,11 @@ export class Graph {
     addpadding();
     const Q = [];
 
-    if (!this.p_list[v][v] || this.p_list[v][v].isEmpty()) return;
+    if (!this.p_list[v][v] || this.p_list[v][v].isEmpty())
+      {
+        shrinkpadding();
+        return;
+      } 
 
     Q.push(this.p_list[v][v].front());
     addCodeLine(`Q <- {${this.p_list[v][v].front().start+1}}`);
@@ -143,12 +147,17 @@ export class Graph {
             shortest += `odstráň {${_parsepath(p_xy,p_xy.start+1)}} z P*(${p_xy.start+1},${p_xy.end})`;
             this.p_star_list[p_xy.start][p_xy.end].remove((el) => el === p_xy);
             if (p_xy.r)
+            {
+
+
               shortest +=`,L*(${_parsepath(p_xy.r,p_xy.r.start+1)})`;
               p_xy.r.L_star = (p_xy.r.L_star || []).filter((x) => x !== p);
-
+            }
             if (p_xy.l)
+            {
               shortest +=`,R*(${_parsepath(p_xy.l,p_xy.l.start+1)})`;
               p_xy.l.R_star = (p_xy.l.R_star || []).filter((x) => x !== p);
+            }
           }
         } catch (e) {
           console.log(e.message);
@@ -254,8 +263,6 @@ export class Graph {
     addCodeLine(`while H != prázdny rad`);
     addpadding();
     while (!H.isEmpty()) {
-
-
       const path_xy = H.dequeue();
       addCodeLine(`vyber cestu {${_parsepath(path_xy,path_xy.start+1)}}`);
       if (!path_xy) continue;
@@ -328,15 +335,16 @@ export class Graph {
           path_xy.R.push(path_x_new_y);
 
           H.enqueue(path_x_new_y);
-         addCodeLine(`pridaj ({${_parsepath(path_new_xy,path_new_xy.start+1)}}) do P(${path_new_xy.start},${path_new_xy.end}), L({${_parsepath(path_a_new_y,path_a_new_y.start+1)}}), R({${_parsepath(path_xy,path_xy.start+1)}}),H`);
+         addCodeLine(`pridaj ({${_parsepath( path_x_new_y, path_x_new_y.start+1)}}) do P(${ path_x_new_y.start},${ path_x_new_y.end}), L({${_parsepath(path_a_new_y,path_a_new_y.start+1)}}), R({${_parsepath(path_xy,path_xy.start+1)}}),H`);
 
         }
         shrinkpadding();
+        shrinkpadding();
       }
-      shrinkpadding();
 
+      shrinkpadding();
     }
-    shrinkpadding();
+
     shrinkpadding();
   }
 
