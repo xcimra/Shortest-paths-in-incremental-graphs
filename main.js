@@ -5,7 +5,7 @@ export let graph = null;
 export let cy;
 let ctr = 0;
 let node1;
-let numVertices;
+let numVertices = null;
 let queueMode;
 export let codeview = false;
 export function checkinput(input) {
@@ -203,12 +203,18 @@ function resetLocallyShortestQueues(){
   }
 }
 function showName() {
+  if (numVertices != null)
+  {
+    alert("ak chcete vytvoriť nový graf obnovte stránku");
+    return;
+  }
   numVertices = parseInt(document.getElementById("nameInput").value);
   if (isNaN(numVertices))
   {
     alert("zadajte spravne cislo");
     return;
   }
+
   console.log(numVertices);
   const elements = [];
 
@@ -286,47 +292,40 @@ function showName() {
 
     layout: { name: "circle" },
   });
+let selectedNode = null;
 
-  cy.on("tap", "node", function (evt) {
-    const node = evt.target;
+cy.on("tap", "node", function (evt) {
+  const node = evt.target;
 
-    if (ctr < 1) {
-      node1 = parseInt(node.id());
-      ctr++;
-      node.addClass("clicked");
-    } else {
-      cy.nodes().removeClass("clicked");
+  if (!selectedNode) {
+    selectedNode = parseInt(node.id());
+    node.addClass("clicked");
+    return;
+  }
 
-      let whole = `P{${node1},${parseInt(node.id())}} obsahuje cesty:`;
-      let current = graph.p_list[node1 - 1][parseInt(node.id()) - 1];
+  const node2 = parseInt(node.id());
 
-      const Q = [];
+  cy.nodes().removeClass("clicked");
 
-      while (!current.isEmpty()) {
-        let path = current.dequeue();
+  let weight = prompt(`Zadajte dĺžku hrany: ${selectedNode}, ${node2}`);
+  if (weight === null) {
+    selectedNode = null;
+    return;
+  }
 
-        Q.push(path);
+  let win = `${node2}:${weight}`;
+  let wout = "";
 
-        let pathstring = `{ ${path.start + 1}`;
-        pathstring = _parsepath(path, pathstring);
-        pathstring += "},";
+  const before = currentMode;
+  currentMode = "hrana";
 
-        whole += pathstring;
-      }
-
-      for (let i = 0; i < Q.length; i++) current.enqueue(Q[i]);
-
-      let weight = prompt(`Zadajte dľžku hrany:${node1},${node.id()}`);
-      win = `${node.id()}:${weight}`
-      wout = ""
-      const before = currentMode;
-      currentMode = "hrana"
-      doupdate(node1, win, wout);
-      currentMode = before
-
-      ctr = 0;
-    }
-  });
+  try {
+    doupdate(selectedNode, win, wout);
+  } finally {
+    currentMode = before;
+    selectedNode = null;
+  }
+});
 }
 
 function _parsepath(result, startstring) {

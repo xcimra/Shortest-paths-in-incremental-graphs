@@ -29,7 +29,7 @@ function _parsepath(result, startstring) {
   return pathstring;
 }
 function getEdgesFromPath(path) {
-  const edges = [];
+  let edges = [];
 
   // full path edge (shortcut like 1-3)
   edges.push(`${path.start}-${path.end}`);
@@ -226,7 +226,7 @@ clone() {
         try {
 
           // remove from P_list
-          const edges = getEdgesFromPath(p_xy);
+          let edges = getEdgesFromPath(p_xy);
 
           const map = new Map();
 
@@ -256,7 +256,7 @@ clone() {
             this.p_star_list[p_xy.start][p_xy.end].front() === p_xy
           ) {
             // remove from P_list
-            const edges = getEdgesFromPath(p_xy);
+            let edges = getEdgesFromPath(p_xy);
 
             const map = new Map();
 
@@ -435,7 +435,7 @@ clone() {
         }
 
         // remove from P_list
-        const edges = getEdgesFromPath(path_xy);
+        let edges = getEdgesFromPath(path_xy);
 
         let map = new Map();
 

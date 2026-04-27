@@ -1,6 +1,20 @@
-import { codeview, updateCytoscapeEdgesCode,graph } from "./main.js";
+import { codeview, updateCytoscapeEdgesCode,graph,checkinput } from "./main.js";
 // editor.js
+export function checkinput1(input) {
+  if (graph == null) {
+    alert("zadajte najprv počet vrcholov");
+    return false;
+  }
 
+  const inp = Number(input);
+
+  if (!Number.isInteger(inp) || inp <= 0) {
+    alert("Zadajte kladné celé číslo väčšie ako 0");
+    return false;
+  }
+
+  return true;
+}
 const codeLines = [
 
 ];
@@ -129,12 +143,12 @@ export function goToLine() {
     return;
   }
   const input = document.getElementById("gotoLineInput");
-  if (!checkinput(input))
+
+  const line = parseInt(input.value);
+  if (!checkinput1(line))
   {
     return;
   }
-  const line = parseInt(input.value);
-
   if (isNaN(line)) return;
   console.log(line,codeLines.length);
   if (line-1<codeLines.length)
