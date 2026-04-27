@@ -11,16 +11,20 @@
 
 <body>
 <div>
+    <div style="display: flex;">
+        <button onclick="nextStep()">Ďalší Krok</button>
+        <button id="codemode" onclick="codeView()">Mód pozerania kodu</button>
+        <button onclick="beforeStep()">Krok späť</button>
+        <input id="gotoLineInput" type="number" min="1" placeholder="riadok kodu" style="width: 80px;" />
+        <button onclick="goToLine()">Riadok</button>
+    </div>
     <div>
         <div class="editor">
         <div class="line-numbers" id="lines"></div>
         <div class="code" id="code"></div>
         <div class="cursor" id="cursor">➤</div>
     </div>
-    <div style="display: flex;">
-        <button onclick="nextStep()">Next</button>
-        <button onclick="beforeStep()">Before</button>
-    </div>
+
 </div>
 
 </div>

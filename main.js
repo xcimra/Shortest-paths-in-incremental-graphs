@@ -1,20 +1,59 @@
 import { Graph } from "./graph.js";
-import { initEditor, nextStep,addCodeLine,beforeStep } from "./editor.js";
-let graph = null;
-let cy;
+import { initEditor, nextStep,addCodeLine,beforeStep,history,counter,goToLine,resetcurrentline} from "./editor.js";
+export let graph = null;
+
+export let cy;
 let ctr = 0;
 let node1;
 let numVertices;
 let queueMode;
+export let codeview = false;
+export function checkinput(input) {
+  if (graph == null) {
+    alert("zadajte najprv počet vrcholov");
+    return false;
+  }
+
+  const inp = Number(input);
+
+  if (!Number.isInteger(inp) || inp <= 0) {
+    alert("Zadajte kladné celé číslo väčšie ako 0");
+    return false;
+  }
+
+  return true;
+}
+export function codeView(){
+  if (graph == null) {
+    alert("zadajte najprv počet vrcholov");
+    return false;
+  }
+  const btn = document.getElementById("codemode");
+  codeview =!codeview;
+  cy.edges().remove();
+  if (codeview)
+  {
+    btn.textContent = "preč s módu pozerania kodu";
+    return;
+  }
+  updateCytoscapeEdges(graph);
+  resetcurrentline();
+  btn.textContent = "mód pozerania kodu";
+
+  
 
 
+  //updateCytoscapeEdges(graph);
+};
 
 window.addEventListener("DOMContentLoaded", () => {
   initEditor();
 
   // 🔥 expose to HTML
   window.nextStep = nextStep;
+  window.codeView =codeView;
   window.beforeStep = beforeStep;
+  window.goToLine = goToLine;
 });
 
 function addPaths(paths, id) {
@@ -232,6 +271,8 @@ function showName() {
           "text-background-color": "white",
           "text-background-opacity": 1,
           "text-background-padding": "2px",
+          "line-color": "data(color)",         
+          "target-arrow-color": "data(color)",  
         },
       },
       {
@@ -300,14 +341,15 @@ function _parsepath(result, startstring) {
 }
 
 function getdistance(x, y) {
-  if (graph == null)
+  console.log("a");
+  if (!checkinput(x) || !checkinput(y))
   {
-    alert("zadajte najprv počet vrcholov");
     return;
   }
+
   x = parseInt(x) - 1;
   y = parseInt(y) - 1;
-  if ((isNaN(x) || x == null || x >=numVertices || x <0 ) ||(isNaN(y) || y == null || y >=numVertices || y <0 ))
+  if ((x >=graph.V ) ||(  y >=graph.V ))
   {
     alert("vyplnte správne začiatočný a koncový vrchol");
     return;
@@ -323,17 +365,14 @@ function getdistance(x, y) {
 
 function getpath(x, y) {
 
-  if (graph == null)
+  if (!checkinput(x) || !checkinput(y))
   {
-    alert("zadajte najprv počet vrcholov");
     return;
   }
-  
   x = parseInt(x) - 1;
   y = parseInt(y) - 1;
-  if ((isNaN(x) || x == null || x >=numVertices || x <0 ) ||(isNaN(y) || y == null || y >=numVertices || y <0 ))
+  if ((x >=graph.V ) ||(  y >=graph.V ))
   {
-      console.log("yes");
     alert("vyplnte správne začiatočný a koncový vrchol");
     return;
   }
@@ -354,12 +393,19 @@ function getpath(x, y) {
 }
 
 function doupdate(v, win, wout) {
-  if (graph == null)
+  if (codeview)
   {
-    alert("zadajte najprv počet vrcholov");
+    alert("pozeranie kodu zapnute");
     return;
   }
-
+  if (!checkinput(v))
+  {
+    return;
+  }
+  if (v-1 >=graph.V){
+    alert("zle zadany vrchol");
+    return;
+  }
   const selected = document.querySelector('input[name="inputType"]:checked');
 
 
@@ -378,6 +424,7 @@ const resultOut = Array(numVertices).fill(Infinity);
 // load CURRENT graph values
 for (let i = 0; i < numVertices; i++) {
   if (!graph.p_list[v_start][i].isEmpty()) {
+
     resultIn[i] = graph.p_list[v_start][i].front().weight;
   }
 
@@ -385,39 +432,62 @@ for (let i = 0; i < numVertices; i++) {
     resultOut[i] = graph.p_list[i][v_start].front().weight;
   }
 }
-  win.split(",").forEach(pair => {
-    const [v, h] = pair.trim().split(":");
-    resultIn[Number(v)-1] = Number(h);
-  });
-  if (resultIn[v_start] == Infinity){
-    resultIn[v_start] = 0;
+  try{
+    win.split(",").forEach(pair => {
+      const [v, h] = pair.trim().split(":");
+      console.log(Number(h));
+      resultIn[Number(v)-1] = Number(h);
+    });
+    if (resultIn[v_start] == Infinity){
+      resultIn[v_start] = 0;
+    }
+
+
+    wout.split(",").forEach(pair => {
+      const [v, h] = pair.trim().split(":");
+      
+      resultOut[Number(v)-1] = Number(h);
+    });
   }
-
-
-  wout.split(",").forEach(pair => {
-    const [v, h] = pair.trim().split(":");
-    resultOut[Number(v)-1] = Number(h);
-  });
+  catch (e)
+  {
+    alert("zly vstup");
+  }
   w = [resultIn,resultOut];
   if (resultOut[v_start] == Infinity){
     resultOut[v_start] = 0;
   }
   }
   else{
-    w = [
-      win.split(",").map((x) => (x.trim() == "inf" ? Infinity : Number(x))),
-      wout.split(",").map((x) => (x.trim() == "inf" ? Infinity : Number(x))),
-    ];
+const parseArray = (str) => {
+  const arr = str.split(",").map(x =>
+    x.trim().toLowerCase() === "inf" ? Infinity : Number(x)
+  );
+
+  if (arr.some(v => Number.isNaN(v))) {
+    alert("Zlý vstup");
+    return null;
+  }
+
+  return arr;
+};
+
+const inArr = parseArray(win);
+const outArr = parseArray(wout);
+
+if (!inArr || !outArr) return;
+
+w = [inArr, outArr];
   }
   console.log(w);
   console.log(v_start);
   graph.update(v_start, w);
 
   resetShortestQueues();
-  updateCytoscapeEdges();
+  updateCytoscapeEdges(graph);
 }
 
-function updateCytoscapeEdges() {
+function updateCytoscapeEdges(graph) {
   if (!cy) return;
 
   cy.edges().remove();
@@ -441,7 +511,86 @@ function updateCytoscapeEdges() {
     }
   }
 }
+export function updateCytoscapeEdgesCode(graph, colorMap) {
+  if (!cy || !graph) return;
 
+  cy.edges().remove();
+
+  const edgeExists = new Set();
+
+  const getColor = (key) =>
+    colorMap instanceof Map ? colorMap.get(key) : null;
+
+  // =========================
+  // 1. GRAPH EDGES (always drawn)
+  // =========================
+  for (let i = 0; i < graph.V; i++) {
+    for (let j = 0; j < graph.V; j++) {
+      const queue = graph.p_list[i][j];
+      if (!queue || queue.isEmpty() || i === j) continue;
+
+      const path = queue.front();
+
+      const u = path.start + 1;
+      const v = path.end + 1;
+      const key = `${u-1}-${v-1}`;
+
+      const color = getColor(key) || "#999";
+
+      cy.add({
+        data: {
+          id: `e_${key}`,
+          source: `${u}`,
+          target: `${v}`,
+          weight: path.weight,
+          color
+        }
+      });
+
+      edgeExists.add(key);
+    }
+  }
+
+  // =========================
+  // 2. EXTRA EDGES (ONLY NEW ONES)
+  // =========================
+  if (colorMap instanceof Map) {
+    for (const [key, color] of colorMap.entries()) {
+      if (!key.includes("-") || key.startsWith("P")) continue;
+
+      const [x, y] = key.split("-").map(Number);
+
+      const u = x + 1;
+      const v = y + 1;
+
+      const finalKey = `${u-1}-${v-1}`;
+
+      if (edgeExists.has(finalKey)) continue;
+
+      // try to get weight from graph
+      let weight = "";
+
+      if (
+        graph.p_list[x]?.[y] &&
+        !graph.p_list[x][y].isEmpty()
+      ) {
+        weight = graph.p_list[x][y].front().weight;
+      }
+
+      cy.add({
+        data: {
+          id: `e_extra_${finalKey}`,
+          source: `${u}`,
+          target: `${v}`,
+          weight,
+          color: color || "#999"
+        }
+      });
+
+      edgeExists.add(finalKey);
+    }
+  }
+}
 
 
 

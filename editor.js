@@ -1,17 +1,25 @@
+import { codeview, updateCytoscapeEdgesCode,graph } from "./main.js";
 // editor.js
 
 const codeLines = [
 
 ];
-const history = []
+const counthistory = [];
+export const history = []
 // internal state
-let currentLine = 0;
 
+export let currentLine = 0;
+export function resetcurrentline()
+{
+  currentLine = 0;
+  moveCursor();
+}
 // DOM refs (set during init)
 let codeDiv = null;
 let linesDiv = null;
 let cursor = null;
 let padding =0
+export let counter =0;
 /**
  * Initialize editor (call after DOM is ready)
  */
@@ -28,12 +36,18 @@ export function initEditor() {
   render();
 }
 export function addCodeLine(line) {
+  counter++;
   codeLines.push((" ".repeat(padding))+line);
   render();
 }
-export function addhistory(event) {
-    history.push(event);
+export function addhistory(graph,special) {
+  history.push([counter,graph.clone(),special]);
+  counthistory.push(counter);
+  console.log(history.at(-1));
+  console.log(history.length);
+  console.log(counter);
 }
+
 export function addpadding() {
     padding +=4
 }
@@ -78,12 +92,83 @@ export function moveCursor() {
  * Advance execution by one step
  */
 export function nextStep() {
+  if (graph ===null)
+  {
+    alert("zadajte počet vrcholov grafu");
+    return;
+  }
+  if (codeview === false )
+  {
+    alert("stlačte najprv Mód pozerania kódu");
+    return;
+  }
   if (currentLine < codeLines.length - 1) {
     currentLine++;
+    const cur = counthistory.indexOf(currentLine);
+    if (cur !== -1)
+    {
+      console.log("yes");
+      console.log(history[cur][0]);
+      console.log(history[cur][1]);
+      updateCytoscapeEdgesCode(history[cur][1], history[cur][2]);
+    }
+
     moveCursor();
   }
 }
+export function goToLine() {
+  if (graph ===null)
+  {
+    alert("zadajte počet vrcholov grafu");
+    return;
+  }
+
+  if (codeview === false )
+  {
+    alert("stlačte najprv Mód pozerania kódu");
+    return;
+  }
+  const input = document.getElementById("gotoLineInput");
+  if (!checkinput(input))
+  {
+    return;
+  }
+  const line = parseInt(input.value);
+
+  if (isNaN(line)) return;
+  console.log(line,codeLines.length);
+  if (line-1<codeLines.length)
+  {
+
+    currentLine = line-1;
+  }
+  moveCursor();
+  if (currentLine < codeLines.length  && line -1<codeLines.length ) {
+
+    const cur = counthistory.indexOf(currentLine);
+    console.log(counthistory.indexOf(currentLine));
+    if (cur !== -1)
+    {
+      console.log("yes");
+      console.log(history[cur][0]);
+      console.log(history[cur][1]);
+      updateCytoscapeEdgesCode(history[cur][1], history[cur][2]);
+    }
+
+
+  }
+}
 export function beforeStep() {
+  if (graph ===null)
+  {
+    alert("zadajte počet vrcholov grafu");
+    return;
+  }
+  if (codeview === false )
+  {
+    alert("stlačte najprv Mód pozerania kódu");
+    return;
+  }
   if (currentLine >0) {
     currentLine--;
     moveCursor();
