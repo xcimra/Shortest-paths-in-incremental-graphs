@@ -57,9 +57,7 @@ export function addCodeLine(line) {
 export function addhistory(graph,special) {
   history.push([counter,graph.clone(),special]);
   counthistory.push(counter);
-  console.log(history.at(-1));
-  console.log(history.length);
-  console.log(counter);
+
 }
 
 export function addpadding() {

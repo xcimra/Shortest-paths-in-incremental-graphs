@@ -33,7 +33,7 @@ function getEdgesFromPath(path) {
 
   // full path edge (shortcut like 1-3)
   edges.push(`${path.start}-${path.end}`);
-  console.log(`full${path.start}-${path.end}`);
+
   // walk through the chain using r
   let current = path;
 
@@ -54,31 +54,321 @@ function getEdgesFromPath(path) {
   return edges;
 }
 export class Graph {
-  constructor(vertices,logger = () => {}) {
+
+constructor(vertices, matrix = null, logger = () => {}) {
     this.V = vertices;
     this.log = logger;
+    console.log("yes");
     this.p_list = Array.from({ length: vertices }, () =>
-      Array.from(
-        { length: vertices },
-        () => new MinPriorityQueue((path) => path.weight),
-      ),
+        Array.from(
+            { length: vertices },
+            () => new MinPriorityQueue(path => path.weight)
+        )
     );
 
     this.p_star_list = Array.from({ length: vertices }, () =>
-      Array.from(
-        { length: vertices },
-        () => new MinPriorityQueue((path) => path.weight),
-      ),
+        Array.from(
+            { length: vertices },
+            () => new MinPriorityQueue(path => path.weight)
+        )
+    );
+    if (matrix) {
+        this.initializeFromMatrix(matrix);
+        //this.initializeLocallyShortestPaths();
+    }
+}
+createIncomingEdges(matrix) {
+    const n = matrix.length;
+
+    // incoming[v][u] = weight of edge u -> v (Infinity if none)
+    const incoming = Array.from(
+        { length: n },
+        () => Array(n).fill(Infinity)
     );
 
-    for (let i = 0; i < vertices; i++) {
-      let path = new Path(i, i);
+    for (let u = 0; u < n; u++) {
+        for (let v = 0; v < n; v++) {
+            if (u !== v && matrix[u][v] < Infinity) {
+                incoming[v][u] = matrix[u][v];
+            }
+        }
+    }
+
+    return incoming;
+}
+initializeFromMatrix(matrix) {
+    const n = this.V;
+    const dist = matrix.map(row => [...row]);
+    const edges  = matrix.map(row => [...row]);
+    const next = Array.from({ length: n }, () => Array(n).fill(-1));
+    const count = Array.from({ length: n }, () => Array(n).fill(0));
+
+    for (let i = 0; i < n; i++) {
+        dist[i][i] = 0;
+        next[i][i] = i;
+        count[i][i] = 1;
+
+        for (let j = 0; j < n; j++) {
+            if (i !== j && matrix[i][j] < Infinity) {
+                next[i][j] = j;
+                count[i][j] = 1;
+            }
+        }
+    }
+
+    // Floyd-Warshall
+    for (let k = 0; k < n; k++) {
+        for (let i = 0; i < n; i++) {
+            if (dist[i][k] === Infinity) continue;
+            if (i === k) continue;
+            for (let j = 0; j < n; j++) {
+                if (dist[k][j] === Infinity) continue;
+                if (j === k || i === j) continue;
+                const through = dist[i][k] + dist[k][j];
+
+                if (through < dist[i][j]) {
+                    dist[i][j] = through;
+                    next[i][j] = next[i][k];
+                    count[i][j] = count[i][k] * count[k][j];
+                } else if (
+                    through === dist[i][j] &&
+                    through < Infinity &&
+                    next[i][j] !== next[i][k]
+                ) {
+                    count[i][j] += count[i][k] * count[k][j];
+                }
+            }
+        }
+    }
+
+    console.log("dist:", dist);
+    alert("Initializing graph...");
+
+    this.checkUniqueShortestPaths(edges);
+
+
+    // Build Path objects
+    // trivial
+    const pathTable = Array.from({ length: n }, () => Array(n).fill(null));
+    for (let i = 0; i < n; i++) {
+      const path = new Path(i, i);
       path.weight = 0;
+      pathTable[i][i] = path;
 
       this.p_list[i][i].enqueue(path);
       this.p_star_list[i][i].enqueue(path);
-    }
   }
+  for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+          if (i !== j && edges[i][j] < Infinity) {
+              let path = new Path(i, j);
+              path.weight = edges[i][j];
+              this.p_list[i][j].enqueue(path);
+              path.l = this.p_list[i][i].front();
+              path.r = this.p_list[j][j].front();
+              path.l.R.push(path);
+              path.r.L.push(path);
+                            pathTable[i][j] = path;
+              if (dist[i][j] !== edges[i][j]) continue;
+
+              this.p_star_list[i][j].enqueue(path);
+              path.l.R_star.push(path);
+              path.r.L_star.push(path);
+
+          }
+      }
+  }
+
+
+  for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+
+        if (i === j || dist[i][j] === Infinity){
+          continue;
+        }
+        let path = new Path(i, j);
+        path.weight = dist[i][j];
+        
+        // Already inserted above as a direct edge
+        if (dist[i][j] === edges[i][j])
+            continue;
+        pathTable[i][j] = path;
+        this.p_list[i][j].enqueue(path);
+        this.p_star_list[i][j].enqueue(path);
+      }
+  }
+    
+  // Pass 2: set l and r
+  for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+
+          if (i === j || dist[i][j] === Infinity)
+              continue;
+
+          const path = pathTable[i][j];
+
+          // a = second vertex on shortest path i -> j
+          const a = next[i][j];
+
+          // Find b = predecessor of j
+          let b = i;
+          while (next[b][j] !== j) {
+              b = next[b][j];
+          }
+
+        path.l = pathTable[i][b];
+        path.r = pathTable[a][j];
+        if (path.l) {
+            if (!path.l.R.includes(path)) path.l.R.push(path);
+            if (!path.l.R_star.includes(path)) path.l.R_star.push(path);
+        }
+
+        if (path.r) {
+            if (!path.r.L.includes(path)) path.r.L.push(path);
+            if (!path.r.L_star.includes(path)) path.r.L_star.push(path);
+        }
+
+      }
+  }
+this.initializeLocallyShortestPaths(dist, this.createIncomingEdges(dist));
+}
+checkUniqueShortestPaths(matrix) {
+    const n = matrix.length;
+
+    for (let source = 0; source < n; source++) {
+
+        const dist = Array(n).fill(Infinity);
+        const ways = Array(n).fill(0);
+        const visited = Array(n).fill(false);
+
+        dist[source] = 0;
+        ways[source] = 1;
+
+        for (;;) {
+
+            // Extract closest unvisited vertex
+            let u = -1;
+            let best = Infinity;
+
+            for (let v = 0; v < n; v++) {
+                if (!visited[v] && dist[v] < best) {
+                    best = dist[v];
+                    u = v;
+                }
+            }
+
+            if (u === -1)
+                break;
+
+            visited[u] = true;
+
+            for (let v = 0; v < n; v++) {
+
+                if (u === v) continue;
+                if (matrix[u][v] === Infinity) continue;
+
+                const nd = dist[u] + matrix[u][v];
+
+                if (nd < dist[v]) {
+                    dist[v] = nd;
+                    ways[v] = ways[u];
+                }
+                else if (nd === dist[v]) {
+                    ways[v] += ways[u];
+                }
+            }
+        }
+
+        for (let v = 0; v < n; v++) {
+            if (ways[v] > 1) {
+                throw new Error(
+                    `Multiple shortest paths from ${source + 1} to ${v + 1}`,{cause:[source + 1, v + 1]}
+                );
+            }
+        }
+    }
+}
+initializeLocallyShortestPaths(outgoingEdges, incomingEdges) {
+    for (let i = 0; i < this.V; i++) {
+        for (let j = 0; j < this.V; j++) {
+
+            if (i === j) continue;
+
+            const P = this.p_list[i][j];
+            if (!P || P.isEmpty()) continue;
+
+            const path = P.front();
+
+            // Left extensions
+            for (let k = 0; k < path.l.L_star.length; k++) {
+
+                const xb = path.l.L_star[k];
+
+                const newPath = new Path(xb.start, j);
+                newPath.weight = xb.weight + path.weight;
+
+                const sp = this.p_star_list[newPath.start][newPath.end];
+
+                if (!sp.isEmpty() &&
+                    newPath.weight === sp.front().weight) {
+                    continue;
+                }
+
+                newPath.l = xb;
+                newPath.r = path;
+
+                const pq = this.p_list[xb.start][j];
+
+                if (!this.hasDuplicate(pq, newPath.l, newPath.r)) {
+                    pq.enqueue(newPath);
+                    xb.R.push(newPath);
+                    path.L.push(newPath);
+                }
+            }
+
+            // Right extensions
+            for (let k = 0; k < path.r.R_star.length; k++) {
+
+                const ay = path.r.R_star[k];
+
+                const newPath = new Path(i, ay.end);
+                newPath.weight = ay.weight + path.weight;
+
+                const sp = this.p_star_list[newPath.start][newPath.end];
+
+                if (!sp.isEmpty() &&
+                    newPath.weight === sp.front().weight) {
+                    continue;
+                }
+
+                newPath.l = path;
+                newPath.r = ay;
+
+                const pq = this.p_list[i][ay.end];
+
+                if (!this.hasDuplicate(pq, newPath.l, newPath.r)) {
+                    pq.enqueue(newPath);
+                    path.R.push(newPath);
+                    ay.L.push(newPath);
+                }
+            }
+        }
+    }
+}
+hasDuplicate(queue, l, r) {
+    const items = queue.toArray();
+    console.log("paths");
+    for (const item of items) {
+        let p = item; // depending on your MinPriorityQueue
+        console.log(`l`, p.l, l);
+        console.log(`r`, p.r, r);
+        if (((p.l == null && l == null) && (p.r == null && r == null)) || (p.l && l && p.l.start === l.start && p.l.end === l.end && p.r && r && p.r.start === r.start && p.r.end === r.end)) {
+            return true;
+        }
+    }
+
+    return false;
+}
 clone() {
   const newGraph = new Graph(this.V, this.log);
 
@@ -202,8 +492,12 @@ clone() {
         shrinkpadding();
         return;
       } 
+    if(!Q.includes(this.p_list[v][v].front()))
+    {
+        Q.push(this.p_list[v][v].front());
+    }
 
-    Q.push(this.p_list[v][v].front());
+
     addCodeLine(`Q <- {${this.p_list[v][v].front().start+1}}`);
     addCodeLine(`while Q nie je prazdny:`);
     addpadding();
@@ -211,7 +505,7 @@ clone() {
       const p = Q.shift(); // match deque  FIFO behavior
       addCodeLine(`vyber cestu {${_parsepath(p,p.start+1)}}`);
       if (!p) continue;
-
+      console.log("cleanup", p.L);
       const neighbors = [...(p.L || []), ...(p.R || [])];
       let paths =neighbors.map((p) => `{${_parsepath(p,p.start+1)}},`)
       addCodeLine(`foreach pxy v {${paths}}`);
@@ -219,7 +513,11 @@ clone() {
       for (const p_xy of neighbors) {
         if (!p_xy) continue;
         addCodeLine(`pridaj {${_parsepath(p_xy,p_xy.start+1)}} do Q`);
-        Q.push(p_xy);
+        if(!Q.includes(p_xy))
+        {
+            Q.push(p_xy);
+        }
+        
         let line = "";
         let shortest = "";
 
@@ -236,18 +534,18 @@ clone() {
           // also keep your P marker
           map.set(`P${p_xy.start}-${p_xy.end}`, "red");
 
-          addhistory(this, map);
+          //addhistory(this, map);
           this.p_list[p_xy.start][p_xy.end].remove((el) => el === p_xy);
-          line += `odstráň {${_parsepath(p_xy,p_xy.start+1)}} z P(${p_xy.start+1},${p_xy.end})`
+          line += `odstráň {${_parsepath(p_xy,p_xy.start+1)}} z P(${p_xy.start+1},${p_xy.end+1})`
           
           if (p_xy.r) {
 
             line +=`,L(${_parsepath(p_xy.r,p_xy.r.start+1)})`;
-            p_xy.r.L = (p_xy.r.L || []).filter((x) => x !== p);
+            p_xy.r.L = (p_xy.r.L || []).filter((x) => x !== p_xy);
           }
           if (p_xy.l) {
             line +=`,R(${_parsepath(p_xy.l,p_xy.l.start+1)})`;
-            p_xy.l.R = (p_xy.l.R || []).filter((x) => x !== p);
+            p_xy.l.R = (p_xy.l.R || []).filter((x) => x !== p_xy);
           }
 
           if (
@@ -255,6 +553,7 @@ clone() {
             !this.p_star_list[p_xy.start][p_xy.end].isEmpty() &&
             this.p_star_list[p_xy.start][p_xy.end].front() === p_xy
           ) {
+            console.log("removing from p_star_list", p_xy);
             // remove from P_list
             let edges = getEdgesFromPath(p_xy);
 
@@ -266,7 +565,7 @@ clone() {
             // also keep your P marker
             map.set(`P${p_xy.start}-${p_xy.end}`, "red");
 
-            addhistory(this, map);
+            //addhistory(this, map);
             shortest += `odstráň {${_parsepath(p_xy,p_xy.start+1)}} z P*(${p_xy.start+1},${p_xy.end+1})`;
             this.p_star_list[p_xy.start][p_xy.end].remove((el) => el === p_xy);
             if (p_xy.r)
@@ -274,16 +573,17 @@ clone() {
 
 
               shortest +=`,L*(${_parsepath(p_xy.r,p_xy.r.start+1)})`;
-              p_xy.r.L_star = (p_xy.r.L_star || []).filter((x) => x !== p);
+              p_xy.r.L_star = (p_xy.r.L_star || []).filter((x) => x !== p_xy);
             }
             if (p_xy.l)
             {
               shortest +=`,R*(${_parsepath(p_xy.l,p_xy.l.start+1)})`;
-              p_xy.l.R_star = (p_xy.l.R_star || []).filter((x) => x !== p);
+              p_xy.l.R_star = (p_xy.l.R_star || []).filter((x) => x !== p_xy);
             }
           }
         } catch (e) {
-          console.log(e.message);
+          console.log(e.message,e.cause);
+          throw e;
         }
         finally{
           if (line !== "")
@@ -300,9 +600,13 @@ clone() {
     }
     shrinkpadding();
     shrinkpadding();
+    console.log("cleanup done");
+    console.log(this.p_list);
+    console.log(this.p_star_list);
   }
 
   fixup(v, w) {
+    console.log("fixup", v, w);
     const from =w[0].filter((a)=> a!== Infinity );
     const to =w[1].filter((a)=> a!== Infinity );
     addCodeLine(`fixup(${v+1},[${from }],[${to}]):`);
@@ -331,15 +635,15 @@ clone() {
         path.r?.L.push(path);
         path.l?.R.push(path);
         addCodeLine(`w({${v+1},${u+1}}) <- {${w_vu}}`);
-        addhistory(this,new Map([[`${v}-${v}`,"green"],[`P${v}-${v}`,"green"]]));
+        //addhistory(this,new Map([[`${v}-${v}`,"green"],[`P${v}-${v}`,"green"]]));
         addCodeLine(`l({${v+1},${u+1}}) <- {${v+1}}`);
-        addhistory(this,new Map([[`${u}-${u}`,"green"],[`P${u}-${u}`,"green"]]));
+        //addhistory(this,new Map([[`${u}-${u}`,"green"],[`P${u}-${u}`,"green"]]));
         addCodeLine(`r({${v+1},${u+1}}) <- {${u+1}}`);
         this.p_list[v][u].enqueue(path);
-        addhistory(this,new Map([[`${v}-${u}`,"green"],[`P${v}-${u}`,"green"]]));
+        //addhistory(this,new Map([[`${v}-${u}`,"green"],[`P${v}-${u}`,"green"]]));
         addCodeLine(`pridaj {${v+1},${u+1}} do P(${v+1},${u+1}), L({${u+1}}), R({${v+1}})`);
 
-        console.log(path);
+
         shrinkpadding();
       }
 
@@ -360,15 +664,14 @@ clone() {
         path.l?.R.push(path);
         path.r?.L.push(path);
         addCodeLine(`w({${u+1},${v+1}}) <- {${w_uv}}`);
-        addhistory(this,new Map([[`${u}-${u}`,"green"],[`P${u}-${u}`,"green"]]));
+        //addhistory(this,new Map([[`${u}-${u}`,"green"],[`P${u}-${u}`,"green"]]));
         addCodeLine(`l({${u+1},${v+1}}) <- {${u+1}}`);
-        addhistory(this,new Map([[`${v}-${v}`,"green"],[`P${v}-${v}`,"green"]]));
+        //addhistory(this,new Map([[`${v}-${v}`,"green"],[`P${v}-${v}`,"green"]]));
         addCodeLine(`r({${u+1},${v+1}}) <- {${v+1}}`);
         this.p_list[u][v].enqueue(path);
-        addhistory(this,new Map([[`${u}-${v}`,"green"],[`P${u}-${v}`,"green"]]));
+        //addhistory(this,new Map([[`${u}-${v}`,"green"],[`P${u}-${v}`,"green"]]));
         addCodeLine(`pridaj ({${u+1},${v+1}}) do P(${u+1},${v+1}), L({${v+1}}), R({${u+1}})`);
 
-        console.log(path);
         shrinkpadding();
       }
 
@@ -445,7 +748,7 @@ clone() {
         // also keep your P marker
         map.set(`P${path_xy.start}-${path_xy.end}`, "green");
 
-        addhistory(this, map);
+        //addhistory(this, map);
         addCodeLine(`pridaj {${_parsepath(path_xy,path_xy.start+1)}} do P*(${path_xy.start+1},${path_xy.end+1}), L*({${_parsepath(path_xy.r,path_xy.r.start+1)}}), R*({${_parsepath(path_xy.l,path_xy.l.start+1)}})`);
 
         let paths =(path_xy.l?.L_star||[]).map((p) => `{${_parsepath(p,p.start+1)}},`);
@@ -462,12 +765,14 @@ clone() {
 
           path_new_xy.l = path_new_xb;
           path_new_xy.r = path_xy;
+          if (this.hasDuplicate(this.p_list[path_new_xy.start][path_new_xy.end], path_new_xy.l, path_new_xy.r)) continue;
+          console.log("enqueueing", path_new_xy);
           this.p_list[path_new_xy.start][path_new_xy.end].enqueue(path_new_xy);
           path_xy.L.push(path_new_xy);
           path_new_xb.R.push(path_new_xy);
 
           H.enqueue(path_new_xy);
-          addCodeLine(`w({${_parsepath(path_new_xy,path_new_xy.start+1)}}) <- w({${_parsepath(this.p_list[path_new_xb.start][path_xy.start].front(),this.p_list[path_new_xb.start][path_xy.start].front().start+1)}) + w({${_parsepath(path_xy,path_xy.start+1)})`);
+          //addCodeLine(`w({${_parsepath(path_new_xy,path_new_xy.start+1)}}) <- w({${_parsepath(this.p_list[path_new_xb.start][path_xy.start].front(),this.p_list[path_new_xb.start][path_xy.start].front().start+1)}) + w({${_parsepath(path_xy,path_xy.start+1)})`);
 
           let edges = getEdgesFromPath(path_new_xy.l);
 
@@ -479,7 +784,7 @@ clone() {
           // also keep your P marker
           map.set(`P${path_new_xy.l.start}-${path_new_xy.l.end}`, "green");
 
-          addhistory(this, map);
+          //addhistory(this, map);
           addCodeLine(`l({${_parsepath(path_new_xy,path_new_xy.start+1)}}) <- {${_parsepath(path_new_xb,path_new_xb.start+1)}}}`);
           edges = getEdgesFromPath(path_new_xy.r);
 
@@ -490,7 +795,7 @@ clone() {
           console.log('rem');
           // also keep your P marker
           map.set(`P${path_new_xy.r.start}-${path_new_xy.r.end}`, "green");
-          addhistory(this, map);
+          //addhistory(this, map);
           addCodeLine(`r({${_parsepath(path_new_xy,path_new_xy.start+1)}}) <- {${_parsepath(path_xy,path_xy.start+1)}}}`);
 
           edges = getEdgesFromPath(path_new_xy);
@@ -502,7 +807,7 @@ clone() {
           console.log('rem');
           // also keep your P marker
           map.set(`P${path_new_xy.start}-${path_new_xy.end}`, "green");
-          addhistory(this, map);
+          //addhistory(this, map);
           addCodeLine(`pridaj ({${_parsepath(path_new_xy,path_new_xy.start+1)}}) do P(${path_new_xy.start+1},${path_new_xy.end+1}), L({${_parsepath(path_xy,path_xy.start+1)}}), R({${_parsepath(path_new_xb,path_new_xb.start+1)}}),H`);
         }
         shrinkpadding();
@@ -513,12 +818,17 @@ clone() {
           console.log ("has r");
           let path_x_new_y = new Path(path_xy.start, path_a_new_y.end);
           addCodeLine(`cesta {${path_x_new_y.start+1},${path_x_new_y.end+1 }}`);
+          console.log(this.p_list[path_xy.end][path_a_new_y.end].front());
+          const edgeFront = this.p_list[path_xy.end][path_a_new_y.end].front();
+          if (!edgeFront) continue
           path_x_new_y.weight =
-            this.p_list[path_xy.end][path_a_new_y.end].front().weight +
+            this.p_list[path_xy.end][path_a_new_y.end].front().weight +//null exception
             path_xy.weight;
 
           path_x_new_y.l = path_xy;
           path_x_new_y.r = path_a_new_y;
+          if (this.hasDuplicate(this.p_list[path_x_new_y.start][path_x_new_y.end], path_x_new_y.l, path_x_new_y.r)) continue;
+          console.log("enqueueing", path_x_new_y);
           this.p_list[path_x_new_y.start][path_x_new_y.end].enqueue(
             path_x_new_y,
           );
@@ -537,7 +847,7 @@ clone() {
           console.log('rem');
           // also keep your P marker
           map.set(`P${path_x_new_y.l.start}-${path_x_new_y.l.end}`, "green");
-          addhistory(this, map);
+          //addhistory(this, map);
           addCodeLine(`l({${_parsepath(path_x_new_y,path_x_new_y.start+1)}}) <- {${_parsepath(path_xy,path_xy.start+1)}}}`);
           edges = getEdgesFromPath(path_x_new_y.r);
 
@@ -548,7 +858,7 @@ clone() {
           console.log('rem');
           // also keep your P marker
           map.set(`P${path_x_new_y.r.start}-${path_x_new_y.r.end}`, "green");
-          addhistory(this, map);
+          //addhistory(this, map);
           addCodeLine(`r({${_parsepath(path_x_new_y,path_x_new_y.start+1)}}) <- {${_parsepath(path_a_new_y,path_a_new_y.start+1)}}}`);
           edges = getEdgesFromPath(path_x_new_y);
 
@@ -559,7 +869,7 @@ clone() {
           console.log('rem');
           // also keep your P marker
           map.set(`P${path_x_new_y.start}-${path_x_new_y.end}`, "green");
-          addhistory(this, map);
+          //addhistory(this, map);
          addCodeLine(`pridaj ({${_parsepath( path_x_new_y, path_x_new_y.start+1)}}) do P(${ path_x_new_y.start+1},${ path_x_new_y.end+1}), L({${_parsepath(path_a_new_y,path_a_new_y.start+1)}}), R({${_parsepath(path_xy,path_xy.start+1)}}),H`);
 
         }
@@ -578,6 +888,7 @@ clone() {
     const to =w[1].filter((a)=> a!== Infinity );
     addCodeLine(`update(${v+1},[${from }],[${to}]): ////nekonečno vynechané`);
     addpadding();
+    alert(w[0]);
     this.cleanup(v);
     this.fixup(v, w);
     shrinkpadding();
