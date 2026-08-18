@@ -305,7 +305,7 @@ initializeLocallyShortestPaths(outgoingEdges, incomingEdges) {
                 const xb = path.l.L_star[k];
 
                 const newPath = new Path(xb.start, j);
-                newPath.weight = xb.weight + path.weight;
+                newPath.weight = this.p_list[xb.start][path.start].front().weight + path.weight;
 
                 const sp = this.p_star_list[newPath.start][newPath.end];
 
@@ -332,7 +332,7 @@ initializeLocallyShortestPaths(outgoingEdges, incomingEdges) {
                 const ay = path.r.R_star[k];
 
                 const newPath = new Path(i, ay.end);
-                newPath.weight = ay.weight + path.weight;
+                newPath.weight = this.p_list[path.end][ay.end].front().weight + path.weight;
 
                 const sp = this.p_star_list[newPath.start][newPath.end];
 
