@@ -732,7 +732,18 @@ if (!inArr || !outArr) return;
 
 w = [inArr, outArr];
   }
-  graph.update(v_start, w);
+  try {
+    graph.update(v_start, w);
+  } catch (error) {
+    if (error.cause) {
+      alert(
+        "Update vytvára viacero najkratších ciest medzi vrcholmi " +
+        `${error.cause[0]} a ${error.cause[1]}. Update bol zamietnutý.`
+      );
+      return;
+    }
+    throw error;
+  }
 
   resetShortestQueues();
   updateCytoscapeEdges(graph);

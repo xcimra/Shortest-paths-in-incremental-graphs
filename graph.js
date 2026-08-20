@@ -98,6 +98,7 @@ createIncomingEdges(matrix) {
 }
 initializeFromMatrix(matrix) {
     const n = this.V;
+  this.edgeMatrix = matrix.map(row => [...row]);
     const dist = matrix.map(row => [...row]);
     const edges  = matrix.map(row => [...row]);
     const next = Array.from({ length: n }, () => Array(n).fill(-1));
@@ -884,11 +885,21 @@ clone() {
   }
 
   update(v, w) {
+    const updatedMatrix = this.edgeMatrix.map(row => [...row]);
+    for (let u = 0; u < this.V; u++) {
+      if (u === v) continue;
+
+      if (w[0][u] !== undefined) updatedMatrix[v][u] = w[0][u];
+      if (w[1][u] !== undefined) updatedMatrix[u][v] = w[1][u];
+    }
+
+    this.checkUniqueShortestPaths(updatedMatrix);
+    this.edgeMatrix = updatedMatrix;
+
     const from =w[0].filter((a)=> a!== Infinity );
     const to =w[1].filter((a)=> a!== Infinity );
     addCodeLine(`update(${v+1},[${from }],[${to}]): ////nekonečno vynechané`);
     addpadding();
-    alert(w[0]);
     this.cleanup(v);
     this.fixup(v, w);
     shrinkpadding();
