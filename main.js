@@ -782,6 +782,30 @@ function updateCytoscapeEdges(graph) {
   // Clear all existing edges from the Cytoscape canvas before redrawing
   cy.edges().remove();
 
+  if (cyPerspective === "edge") {
+    for (let source = 0; source < graph.V; source++) {
+      for (let target = 0; target < graph.V; target++) {
+        if (source === target || graph.edgeMatrix[source][target] === Infinity) {
+          continue;
+        }
+
+        cy.add({
+          data: {
+            id: `edge_${source}_${target}`,
+            source: (source + 1).toString(),
+            target: (target + 1).toString(),
+            weight: formatWeight(graph.edgeMatrix[source][target]),
+            color: "#999"
+          }
+        });
+      }
+    }
+
+    cy.resize();
+    cy.fit();
+    return;
+  }
+
   // Iterate through all pairs of source (i) and target (j) vertices
   for (let i = 0; i < graph.V; i++) {
     for (let j = 0; j < graph.V; j++) {
@@ -828,6 +852,9 @@ function updateCytoscapeEdges(graph) {
       }
     }
   }
+
+  cy.resize();
+  cy.fit();
 }
 export function updateCytoscapeEdgesCode(graph, colorMap) {
   if (!cy || !graph) return;
@@ -923,8 +950,16 @@ window.addEventListener("resize", () => {
   }
 });
 let currentMode = null;
+let cyPerspective = "graph";
 
 window.addEventListener("DOMContentLoaded", () => {
+
+  document.querySelectorAll('input[name="cyPerspective"]').forEach(radio => {
+    radio.addEventListener("change", function () {
+      cyPerspective = this.value;
+      requestAnimationFrame(() => updateCytoscapeEdges(graph));
+    });
+  });
 
   const vectorDiv = document.getElementById("vectorInputs");
   const edgeDiv = document.getElementById("edgeInputs");

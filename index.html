@@ -34,6 +34,16 @@
         <button onclick="beforeStep()">Krok späť</button>
         <input id="gotoLineInput" type="number" min="1" placeholder="riadok kodu" style="width: 80px;" />
         <button onclick="goToLine()">Riadok</button>
+        <span id="cy-perspective-controls">
+        <label>
+        <input type="radio" name="cyPerspective" value="graph" checked>
+        Graf
+        </label>
+        <label>
+        <input type="radio" name="cyPerspective" value="edge">
+        Hrany
+        </label>
+        </span>
     </div>
     <div>
         <div class="editor">

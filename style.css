@@ -13,6 +13,9 @@ body {
 
   display: flex;
 }
+#cy-perspective-controls {
+  margin-left: 16px;
+}
 .card {
   border: 1px solid #999;
   padding: 10px;
