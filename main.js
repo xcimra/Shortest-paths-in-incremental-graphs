@@ -239,6 +239,45 @@ window.addEventListener("DOMContentLoaded", () => {
   window.goToLine = goToLine;
 });
 
+const updateCardsApp = Vue.createApp({
+  data() {
+    return { updates: [], nextId: 1 };
+  },
+  methods: {
+    addUpdate(vertex) {
+      this.updates.push({
+        id: this.nextId++,
+        vertex: vertex + 1,
+        selected: null,
+        phases: [
+          { key: "cleanup", title: "cleanup", description: `Odstránenie všetkých ciest obsahujúcich vrchol ${vertex + 1}` },
+          { key: "fixup-1", title: "fixup 1", description: "Pridanie aktualizovaných hrán" },
+          { key: "fixup-2", title: "fixup 2", description: "Zostavenie prioritného radu H" },
+          { key: "fixup-3", title: "fixup 3", description: "Doplnenie lokálne najkratších ciest" }
+        ]
+      });
+    },
+    selectPhase(update, phase) {
+      update.selected = phase.key;
+    }
+  },
+  template: `
+    <div class="update-cards" aria-live="polite">
+      <h2>Aktualizácie</h2>
+      <section v-for="update in updates" :key="update.id" class="update-group">
+        <h3>Aktualizácia vrcholu {{ update.vertex }}</h3>
+        <button v-for="phase in update.phases" :key="phase.key" type="button"
+          class="update-card"
+          :class="[phase.key === 'cleanup' ? 'cleanup-card' : 'fixup-card', { selected: update.selected === phase.key }]"
+          @click="selectPhase(update, phase)">
+          <strong>{{ phase.title }}</strong>
+          <span>{{ phase.description }}</span>
+        </button>
+      </section>
+    </div>
+  `
+}).mount("#update-app");
+
 function addPaths(paths, id) {
   const panel = document.getElementById("panel");
 
@@ -638,6 +677,10 @@ function getpath(x, y) {
   alert(pathstring + ".");
 }
 
+function addUpdateCards(vertex) {
+  updateCardsApp.addUpdate(vertex);
+}
+
 function doupdate(v, win, wout) {
   if (codeview)
   {
@@ -746,6 +789,7 @@ w = [inArr, outArr];
   }
 
   resetShortestQueues();
+  addUpdateCards(v_start);
   updateCytoscapeEdges(graph);
 }
 

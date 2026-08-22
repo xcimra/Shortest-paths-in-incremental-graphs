@@ -23,9 +23,60 @@ body {
   margin-bottom: 10px;
   border-radius: 8px;
 }
+.update-cards {
+  width: 100%;
+}
+.update-side-panel {
+  order: -1;
+  flex: 0 0 420px;
+  width: 420px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+.update-group {
+  margin-bottom: 16px;
+}
+.update-group h3 {
+  margin: 0 0 8px;
+}
+.update-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  padding: 12px;
+  border: 2px solid;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+.update-card span {
+  margin-top: 4px;
+  font-size: 0.9em;
+}
+.cleanup-card {
+  border-color: #b42318;
+  background: #fde2e0;
+  color: #7a170f;
+}
+.fixup-cards {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.fixup-card {
+  border-color: #16803c;
+  background: #ddf7e5;
+  color: #105c2b;
+}
+.update-card:hover,
+.update-card.selected {
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.14);
+}
 .editor {
   position: relative;
-  display: flex;
+  display: none !important;
   font-family: monospace;
   border: 1px solid #ccc;
   width: 500px;

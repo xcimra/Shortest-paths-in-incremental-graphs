@@ -7,6 +7,7 @@
 <meta charset="UTF-8">
 <link rel="stylesheet" href="style.css">
   <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
 
 <body>
@@ -29,11 +30,11 @@
 </div>
     <div style="display: flex;">
         <div><h1></h1> </div>
-        <button onclick="nextStep()">Ďalší Krok</button>
-        <button id="codemode" onclick="codeView()">Mód pozerania kodu</button>
-        <button onclick="beforeStep()">Krok späť</button>
-        <input id="gotoLineInput" type="number" min="1" placeholder="riadok kodu" style="width: 80px;" />
-        <button onclick="goToLine()">Riadok</button>
+        <button onclick="nextStep()" style="display: none;">Ďalší Krok</button>
+        <button id="codemode" onclick="codeView()"style="display: none;">Mód pozerania kodu</button>
+        <button onclick="beforeStep()"style="display: none;">Krok späť</button>
+        <input id="gotoLineInput" type="number" min="1" placeholder="riadok kodu" style="width: 80px; display: none;"/>
+        <button onclick="goToLine()" style="display: none;">Riadok</button>
         <span id="cy-perspective-controls">
         <label>
         <input type="radio" name="cyPerspective" value="graph" checked>
@@ -122,5 +123,8 @@
         <label><input type="radio" name="mode1" value="L"> Najkratšie cesty</label>
         <label><input type="radio" name="mode1" value="NonL"> Lokálne najkratšie cesty</label>
     </div>
+    <aside class="side-panel update-side-panel"  aria-label="Aktualizácie">
+        <div id="update-app"></div>
+    </aside>
 </body>
 </html>

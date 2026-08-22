@@ -371,7 +371,7 @@ hasDuplicate(queue, l, r) {
     return false;
 }
 clone() {
-  const newGraph = new Graph(this.V, this.log);
+  const newGraph = new Graph(this.V,null, this.log);
 
   // Map old Path -> new Path
   const map = new Map();
