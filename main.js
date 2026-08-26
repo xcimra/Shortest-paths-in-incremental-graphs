@@ -2,6 +2,7 @@ import { Graph } from "./graph.js";
 import { initEditor, nextStep,addCodeLine,beforeStep,history,counter,goToLine,resetcurrentline} from "./editor.js";
 import { formatWeight, parsePath, parseWeightValue, applyWeightUpdates } from "./utils.js";
 export let graph = null;
+export const labels = [];
 
 export let cy;
 let ctr = 0;
@@ -239,44 +240,215 @@ window.addEventListener("DOMContentLoaded", () => {
   window.goToLine = goToLine;
 });
 
+export function modifyPlaybackStepLabel(labels, stepNumber, newLabel) {
+  if (!Array.isArray(labels)) return [];
+
+  const index = Number(stepNumber);
+  if (!Number.isInteger(index) || index < 0) return labels;
+
+  labels[index] = newLabel;
+  return labels;
+}
+
+export function buildPlaybackStepLabel({ phase, index, isActive = false }) {
+  const phaseKey = phase?.key ?? "cleanup";
+  const phaseNumber = phaseKey.startsWith("fixup-") ? Number(phaseKey.split("-")[1]) : null;
+  const phaseName = phaseKey === "cleanup" ? "cleanup" : `fixup ${phaseNumber ?? 1}`;
+  const stepIndex = index + 1;
+
+  if (isActive) {
+    return `${phaseName} – aktuálny stav`;
+  }
+
+  return `${phaseName} – krok ${stepIndex}`;
+}
+
 const updateCardsApp = Vue.createApp({
   data() {
-    return { updates: [], nextId: 1 };
+    return { updates: [], nextId: 1, player: null, currentStep: 0 };
   },
   methods: {
     addUpdate(vertex) {
       this.updates.push({
         id: this.nextId++,
         vertex: vertex + 1,
+        cleanupSnapshot: graph.cleanupSnapshot,
+        cleanupOriginal: graph.cleanupOriginal,
+        fixupSnapshots: graph.fixupSnapshots,
+        savedStates: graph.savedStates,
         selected: null,
         phases: [
           { key: "cleanup", title: "cleanup", description: `Odstránenie všetkých ciest obsahujúcich vrchol ${vertex + 1}` },
-          { key: "fixup-1", title: "fixup 1", description: "Pridanie aktualizovaných hrán" },
-          { key: "fixup-2", title: "fixup 2", description: "Zostavenie prioritného radu H" },
-          { key: "fixup-3", title: "fixup 3", description: "Doplnenie lokálne najkratších ciest" }
+          { key: "fixup-1", title: "fixup 1", description: `Nastavenie všetkých hrán obsahujúcich vrchol ${vertex + 1}` },
+          { key: "fixup-2", title: "fixup 2", description: "Zostavenie prioritného radu H s najkratšími cestami medzi každou dvojicou vrcholov`" },
+          { key: "fixup-3", title: "fixup 3", description: "Doplnenie lokálne najkratších a najkratších ciest" }
         ]
       });
     },
     selectPhase(update, phase) {
       update.selected = phase.key;
+      if (phase.key === "cleanup") {
+        updateCytoscapeEdgesCode(update.cleanupSnapshot, null, update.cleanupOriginal);
+      } else {
+        const phaseIndex = Number(phase.key.slice(-1)) - 1;
+        const phaseSnapshots = update.fixupSnapshots?.[phaseIndex] || [];
+        const snapshot = phaseSnapshots[phaseIndex === 2 ? phaseSnapshots.length - 1 : 0];
+        if (!snapshot) return;
+        updateCytoscapeEdgesCode(
+          snapshot.graph,
+          null,
+          null,
+          phase.key,
+          update.cleanupSnapshot?.graph || null,
+          snapshot.paths,
+          snapshot.colors
+        );
+      }
+    },
+    goBack() {
+      this.updates.forEach(update => {
+        update.selected = null;
+      });
+      updateCytoscapeEdges(graph);
+      this.closePlayback();
+    },
+    startPlayback(update, phase) {
+      const phaseIndex = phase.key === "cleanup"
+        ? 0
+        : Number(phase.key.slice(-1)) - 1;
+      const saved = phase.key === "cleanup"
+        ? (update.savedStates || [])
+        : (update.fixupSnapshots?.[phaseIndex] || []);
+      if (!saved.length) return;
+      const phaseLabels = phase.key === "cleanup"
+        ? labels
+        : (labels.fixup?.[phaseIndex] || []);
+      const initialState = saved[0];
+      const steps = saved.map((state, index) =>
+        buildPlaybackStepLabel({
+          phase,
+          index,
+          isActive: index === 0
+        })
+      );
+      steps.forEach((step, index) => {
+        if (phaseLabels[index] === undefined) phaseLabels[index] = step;
+        steps[index] = phaseLabels[index];
+      });
+      let goal = "";
+      switch(phase.key) {
+        case "cleanup":
+          goal = `Odstránenie všetkých ciest obsahujúcich vrchol ${update.vertex}`;
+          break;
+        case "fixup-1":
+          goal = `Nastavenie všetkých hrán obsahujúcich vrchol ${update.vertex}`;
+          break;
+        case "fixup-2":
+          goal = "Zostavenie prioritného radu H s najkratšími cestami medzi každou dvojicou vrcholov";
+          break;
+        case "fixup-3":
+          goal = "Doplnenie lokálne najkratších a najkratších ciest";
+          break;
+      }
+      this.player = {
+        update,
+        phase,
+        steps,
+        saved,
+        goal
+      };
+      this.currentStep = 0;
+      document.getElementById("playback-workspace")?.classList.remove("is-hidden");
+      const targetElement = document.getElementById("playback-target");
+      const stepsElement = document.getElementById("playback-steps");
+      if (targetElement) targetElement.textContent = goal;
+      if (stepsElement) stepsElement.innerHTML = `<ol>${steps.map((step, index) =>
+        `<li class="${index === this.currentStep ? "active" : ""}">${step}</li>`
+      ).join("")}</ol>`;
+      update.selected = phase.key;
+      renderSavedGraphState(initialState);
+    },
+    nextStep() {
+      if (this.player && this.currentStep < this.player.steps.length - 1) {
+        this.currentStep++;
+        this.updateWorkspaceStepList();
+        renderSavedGraphState(this.player.saved[this.currentStep]);
+      }
+    },
+    previousStep() {
+      if (this.currentStep > 0) {
+        this.currentStep--;
+        this.updateWorkspaceStepList();
+        renderSavedGraphState(this.player.saved[this.currentStep]);
+      }
+    },
+    updateWorkspaceStepList() {
+      const steps = document.querySelectorAll("#playback-steps li");
+      steps.forEach((step, index) => step.classList.toggle("active", index === this.currentStep));
+    },
+    closePlayback() {
+      this.player = null;
+      this.currentStep = 0;
+      document.getElementById("playback-workspace")?.classList.add("is-hidden");
+      const targetElement = document.getElementById("playback-target");
+      const stepsElement = document.getElementById("playback-steps");
+      if (targetElement) targetElement.textContent = "";
+      if (stepsElement) stepsElement.innerHTML = "";
     }
   },
   template: `
     <div class="update-cards" aria-live="polite">
-      <h2>Aktualizácie</h2>
+      <template v-if="!player">
       <section v-for="update in updates" :key="update.id" class="update-group">
         <h3>Aktualizácia vrcholu {{ update.vertex }}</h3>
-        <button v-for="phase in update.phases" :key="phase.key" type="button"
+        <article v-for="phase in update.phases" :key="phase.key"
           class="update-card"
           :class="[phase.key === 'cleanup' ? 'cleanup-card' : 'fixup-card', { selected: update.selected === phase.key }]"
           @click="selectPhase(update, phase)">
           <strong>{{ phase.title }}</strong>
           <span>{{ phase.description }}</span>
-        </button>
+          <button type="button" class="play-steps" @click.stop="startPlayback(update, phase)">
+            prehrať jednotlivé kroky
+          </button>
+        </article>
+      </section>
+      </template>
+      <button v-if="player" type="button" class="update-back" @click="goBack">Späť na aktuálne cesty</button>
+      <section v-if="player" class="step-player">
+        <div class="player-header">
+          <div>
+            <span class="player-kicker">Prehrávanie</span>
+            <h3>{{ player.phase.title }}</h3>
+          </div>
+          <button type="button" class="player-close" @click="closePlayback" aria-label="Zavrieť prehrávač">x</button>
+        </div>
+        <div class="target-label"><span>Cieľ</span><strong>{{ player.goal }}</strong></div>
+        <div class="steps-panel">
+          <span class="player-kicker">Kroky</span>
+          <ol>
+            <li v-for="(step, index) in player.steps" :key="step" :class="{ active: index === currentStep }">{{ step }}</li>
+          </ol>
+        </div>
+        <div class="current-step"><span>Práve vykonávaný krok</span><strong>{{ player.steps[currentStep] }}</strong></div>
+        <div class="player-controls">
+          <button type="button" @click="previousStep" :disabled="currentStep === 0">Predošlý</button>
+          <button type="button" @click="nextStep" :disabled="currentStep === player.steps.length - 1">Ďalší</button>
+        </div>
+
       </section>
     </div>
   `
 }).mount("#update-app");
+
+function getLoopGeometry(source, target, index, total) {
+  if (source !== target) return {};
+
+  return {
+    loopDirection: (360 / Math.max(total, 1)) * index,
+    loopSweep: 45,
+    loopStep: 55
+  };
+}
 
 function addPaths(paths, id) {
   const panel = document.getElementById("panel");
@@ -474,9 +646,10 @@ async function showName() {
     for (let j = 0; j < graph.V; j++) {
       const queue = graph.p_list[i][j];
 
-      if (!queue || queue.isEmpty() || i === j) continue;
+      if (!queue || queue.isEmpty()) continue;
 
       const temp = [];
+      const totalPaths = queue.size();
       let count = 0;
       while (!queue.isEmpty()) {
         const path = queue.dequeue();
@@ -490,6 +663,7 @@ async function showName() {
             weight: formatWeight(path.weight),
             color: count === 0 ? "#999" : "#FF851B",
             pathObj: path,
+            ...getLoopGeometry(path.start, path.end, count, totalPaths),
           },
         });
       console.log(`Added ${count} edge from ${i + 1} to ${j + 1}`);
@@ -535,6 +709,9 @@ async function showName() {
           "text-background-padding": "2px",
           "line-color": "data(color)",         
           "target-arrow-color": "data(color)",  
+          "loop-direction": "data(loopDirection)",
+          "loop-sweep": "data(loopSweep)",
+          "control-point-step-size": "data(loopStep)",
         },
       },
       {
@@ -820,6 +997,79 @@ function getPathEdgeColor(graph, path) {
   return inStarList ? "#999" : "#FF851B";
 }
 
+export function saveGraphState(sourceGraph = graph, paths = [], colors = new Map()) {
+  if (!sourceGraph) return null;
+
+  const snapshotGraph = sourceGraph.clone();
+
+  const pathSignature = path => {
+    if (!path) return "";
+    let signature = `${path.start}-${path.end}`;
+    let current = path;
+    while (current.r != null) {
+      current = current.r;
+      signature += `-${current.start}-${current.end}`;
+    }
+    return signature;
+  };
+
+  const mapPathToSnapshot = path => {
+    if (!path) return null;
+
+    for (let i = 0; i < snapshotGraph.V; i++) {
+      for (let j = 0; j < snapshotGraph.V; j++) {
+        const queue = snapshotGraph.p_list[i][j];
+        if (!queue || queue.isEmpty()) continue;
+
+        const match = queue.toArray().find(candidate =>
+          candidate &&
+          candidate.start === path.start &&
+          candidate.end === path.end &&
+          candidate.weight === path.weight &&
+          pathSignature(candidate) === pathSignature(path)
+        );
+
+        if (match) return match;
+      }
+    }
+
+    return path;
+  };
+
+  const savedState = {
+    graph: snapshotGraph,
+    paths: (Array.isArray(paths) ? paths : []).map(mapPathToSnapshot).filter(Boolean),
+    colors: colors instanceof Map ? new Map(colors) : new Map(Object.entries(colors || {}))
+  };
+
+  const targetGraphs = [sourceGraph];
+  if (graph && graph !== sourceGraph && Array.isArray(graph.savedStates)) {
+    targetGraphs.push(graph);
+  }
+
+  for (const targetGraph of targetGraphs) {
+    if (Array.isArray(targetGraph.savedStates)) {
+      targetGraph.savedStates.push(savedState);
+    }
+  }
+
+  return savedState;
+}
+
+export function renderSavedGraphState(savedState) {
+  if (!savedState?.graph) return;
+
+  updateCytoscapeEdgesCode(
+    savedState.graph,
+    null,
+    null,
+    null,
+    null,
+    savedState.paths,
+    savedState.colors
+  );
+}
+
 function updateCytoscapeEdges(graph) {
   if (!cy) return;
 
@@ -856,7 +1106,7 @@ function updateCytoscapeEdges(graph) {
       const queue = graph.p_list[i][j];
 
       // Skip if the queue is missing, empty, or represents a self-loop
-      if (!queue || queue.isEmpty() || i === j) continue;
+      if (!queue || queue.isEmpty()) continue;
 
       // Temporary array to hold paths pulled from the priority queue
       // so we can restore the queue's original state later
@@ -884,7 +1134,8 @@ function updateCytoscapeEdges(graph) {
             target: targetNode,
             weight: formatWeight(path.weight),
             color,
-            pathObj: path
+            pathObj: path,
+            ...getLoopGeometry(path.start, path.end, tempPaths.length - 1, queue.size())
           },
         });
       }
@@ -900,15 +1151,62 @@ function updateCytoscapeEdges(graph) {
   cy.resize();
   cy.fit();
 }
-export function updateCytoscapeEdgesCode(graph, colorMap) {
+export function updateCytoscapeEdgesCode(
+  graph,
+  colorMap,
+  originalGraph = null,
+  highlightMode = null,
+  baselineGraph = null,
+  additionalPaths = [],
+  pathColors = new Map()
+) {
   if (!cy || !graph) return;
 
   cy.edges().remove();
 
   const edgeExists = new Set();
 
+  const pathSignature = path => {
+    let signature = `${path.start}-${path.end}`;
+    let current = path;
+    while (current.r != null) {
+      current = current.r;
+      signature += `-${current.start}-${current.end}`;
+    }
+    return signature;
+  };
+
+  const snapshotPaths = new Set();
+  for (let i = 0; i < graph.V; i++) {
+    for (let j = 0; j < graph.V; j++) {
+      const queue = graph.p_list[i][j];
+      if (!queue) continue;
+      queue.toArray().forEach(path => snapshotPaths.add(pathSignature(path)));
+    }
+  }
+
+  const baselinePaths = new Set();
+  if (baselineGraph) {
+    for (let i = 0; i < baselineGraph.V; i++) {
+      for (let j = 0; j < baselineGraph.V; j++) {
+        baselineGraph.p_list[i][j]?.toArray().forEach(path => {
+          baselinePaths.add(pathSignature(path));
+        });
+      }
+    }
+  }
+
   const getColor = (key) =>
     colorMap instanceof Map ? colorMap.get(key) : null;
+
+  const getPathColor = path => {
+    const key = pathSignature(path);
+    if (typeof pathColors === "function") return pathColors(path);
+    if (pathColors instanceof Map) {
+      return pathColors.get(key) ?? pathColors.get(pathSignature(path)) ?? null;
+    }
+    return pathColors?.[key];
+  };
 
   // =========================
   // 1. GRAPH EDGES (always drawn)
@@ -916,27 +1214,82 @@ export function updateCytoscapeEdgesCode(graph, colorMap) {
   for (let i = 0; i < graph.V; i++) {
     for (let j = 0; j < graph.V; j++) {
       const queue = graph.p_list[i][j];
-      if (!queue || queue.isEmpty() || i === j) continue;
+      if (!queue || queue.isEmpty()) continue;
 
-      const path = queue.front();
-
-      const u = path.start + 1;
-      const v = path.end + 1;
-      const key = `${u-1}-${v-1}`;
-
-      const color = getPathEdgeColor(graph, path);;
-
-      cy.add({
-        data: {
-          id: `e_${key}`,
-          source: `${u}`,
-          target: `${v}`,
-          weight: formatWeight(path.weight),
-          color
+      const paths = highlightMode || pathColors instanceof Map && pathColors.size > 0
+        ? queue.toArray()
+        : [queue.front()];
+      paths.forEach((path, index) => {
+        const u = path.start + 1;
+        const v = path.end + 1;
+        const key = `${u-1}-${v-1}`;
+        const explicitColor = getPathColor(path);
+        let color = explicitColor || getPathEdgeColor(graph, path);
+        if (!explicitColor && (highlightMode === "fixup-2" || highlightMode === "fixup-3")) {
+          color = "#16803c";
+        } else if (!explicitColor && highlightMode === "fixup-1" && !baselinePaths.has(pathSignature(path))) {
+          color = "#16803c";
         }
-      });
 
-      edgeExists.add(key);
+        cy.add({
+          data: {
+            id: `e_${key}_${index}`,
+            source: `${u}`,
+            target: `${v}`,
+            weight: formatWeight(path.weight),
+            color,
+            ...getLoopGeometry(path.start, path.end, index, paths.length)
+          }
+        });
+
+        edgeExists.add(key);
+      });
+    }
+  }
+
+  const pathsToAdd = additionalPaths.filter(path =>
+    path && !snapshotPaths.has(pathSignature(path))
+  );
+  pathsToAdd.forEach((path, index) => {
+    const source = path.start + 1;
+    const target = path.end + 1;
+    cy.add({
+      data: {
+        id: `added_path_${source}_${target}_${index}`,
+        source: `${source}`,
+        target: `${target}`,
+        weight: formatWeight(path.weight),
+        color: getPathColor(path) || "#16803c",
+        pathObj: path,
+        ...getLoopGeometry(path.start, path.end, index, pathsToAdd.length)
+      }
+    });
+  });
+
+  if (originalGraph) {
+    for (let i = 0; i < originalGraph.V; i++) {
+      for (let j = 0; j < originalGraph.V; j++) {
+        const queue = originalGraph.p_list[i][j];
+        if (!queue) continue;
+
+        const originalPaths = queue.toArray();
+        originalPaths.forEach((path, index) => {
+          if (snapshotPaths.has(pathSignature(path))) return;
+
+          const source = path.start + 1;
+          const target = path.end + 1;
+          cy.add({
+            data: {
+              id: `removed_${i}_${j}_${index}`,
+              source: `${source}`,
+              target: `${target}`,
+              weight: formatWeight(path.weight),
+              color: "#b42318",
+              ...getLoopGeometry(path.start, path.end, index, originalPaths.length)
+            }
+          });
+        });
+      }
     }
   }
 

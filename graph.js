@@ -1,5 +1,6 @@
 import { MinPriorityQueue } from "https://cdn.skypack.dev/@datastructures-js/priority-queue";
 import { addpadding,shrinkpadding,addhistory, addCodeLine } from "./editor.js";
+import { saveGraphState, modifyPlaybackStepLabel, labels } from "./main.js";
 export class Path {
   constructor(start, end) {
     this.node_p = null;
@@ -72,6 +73,7 @@ constructor(vertices, matrix = null, logger = () => {}) {
             () => new MinPriorityQueue(path => path.weight)
         )
     );
+    this.savedStates = [];
     if (matrix) {
         this.initializeFromMatrix(matrix);
         //this.initializeLocallyShortestPaths();
@@ -143,7 +145,6 @@ initializeFromMatrix(matrix) {
     }
 
     console.log("dist:", dist);
-    alert("Initializing graph...");
 
     this.checkUniqueShortestPaths(edges);
 
@@ -372,6 +373,7 @@ hasDuplicate(queue, l, r) {
 }
 clone() {
   const newGraph = new Graph(this.V,null, this.log);
+  newGraph.edgeMatrix = this.edgeMatrix?.map(row => [...row]) || null;
 
   // Map old Path -> new Path
   const map = new Map();
@@ -492,10 +494,20 @@ clone() {
       {
         shrinkpadding();
         return;
-      } 
-    if(!Q.includes(this.p_list[v][v].front()))
+      }
+    const originalState = this.clone();
+    const initialPath = this.p_list[v][v].front();
+    const initialPathColor = new Map([[
+      `${initialPath.start}-${initialPath.end}` +
+      (initialPath.r ? `-${initialPath.r.start}-${initialPath.r.end}` : ""),
+      "green"
+    ]]);
+    saveGraphState(this, [initialPath], initialPathColor);
+    let stepLabelCount = 0;
+    modifyPlaybackStepLabel(labels, stepLabelCount++, `inicializujem rad Q s cestou {${_parsepath(initialPath, initialPath.start + 1)}}`);
+    if(!Q.includes(initialPath))
     {
-        Q.push(this.p_list[v][v].front());
+        Q.push(initialPath);
     }
 
 
@@ -504,6 +516,12 @@ clone() {
     addpadding();
     while (Q.length !== 0) {
       const p = Q.shift(); // match deque  FIFO behavior
+      initialPathColor.set(`${p.start}-${p.end}` + (p.r ? `-${p.r.start}-${p.r.end}` : ""), "red");
+      modifyPlaybackStepLabel(labels, stepLabelCount++, `odstránim cestu {${_parsepath(p , p .start + 1)}} z Q`);
+      saveGraphState(this, [p], initialPathColor);
+      if (p.start === p.end && p.l === null && p.r === null) {
+        initialPathColor.delete(`${p.start}-${p.end}` + (p.r ? `-${p.r.start}-${p.r.end}` : ""));
+      }
       addCodeLine(`vyber cestu {${_parsepath(p,p.start+1)}}`);
       if (!p) continue;
       console.log("cleanup", p.L);
@@ -513,6 +531,9 @@ clone() {
       addpadding();
       for (const p_xy of neighbors) {
         if (!p_xy) continue;
+        initialPathColor.set(`${p_xy.start}-${p_xy.end}` + (p_xy.r ? `-${p_xy.r.start}-${p_xy.r.end}` : ""), "green");
+        saveGraphState(this, [p_xy], initialPathColor);
+        modifyPlaybackStepLabel(labels, stepLabelCount++, `pridám cestu {${_parsepath(p_xy,p_xy.start+1)}} predĺženú o jeden vrchol do Q`);
         addCodeLine(`pridaj {${_parsepath(p_xy,p_xy.start+1)}} do Q`);
         if(!Q.includes(p_xy))
         {
@@ -537,16 +558,41 @@ clone() {
 
           //addhistory(this, map);
           this.p_list[p_xy.start][p_xy.end].remove((el) => el === p_xy);
+          initialPathColor.set(`${p_xy.start}-${p_xy.end}` + (p_xy.r ? `-${p_xy.r.start}-${p_xy.r.end}` : ""), "red");
+          saveGraphState(this, [p_xy], initialPathColor);
+          modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} z prioritného radu lokálne najkratších ciest`);
+
           line += `odstráň {${_parsepath(p_xy,p_xy.start+1)}} z P(${p_xy.start+1},${p_xy.end+1})`
           
           if (p_xy.r) {
 
             line +=`,L(${_parsepath(p_xy.r,p_xy.r.start+1)})`;
             p_xy.r.L = (p_xy.r.L || []).filter((x) => x !== p_xy);
+            const before =initialPathColor.get(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""));
+            initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""), "blue");
+            saveGraphState(this, [p_xy], initialPathColor);
+            modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu predĺžení cesty (${_parsepath(p_xy.r,p_xy.r.start+1)})`);
+            if (before != undefined) {
+              initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""), before);
+            }
+            else{
+              initialPathColor.delete(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""));
+            }
           }
           if (p_xy.l) {
             line +=`,R(${_parsepath(p_xy.l,p_xy.l.start+1)})`;
             p_xy.l.R = (p_xy.l.R || []).filter((x) => x !== p_xy);
+            p_xy.r.L = (p_xy.r.L || []).filter((x) => x !== p_xy);
+            const before =initialPathColor.get(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
+            initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), "blue");
+            saveGraphState(this, [p_xy], initialPathColor);
+            modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu lokálne najkratších predĺžení cesty (${_parsepath(p_xy.l,p_xy.l.start+1)})`);
+            if (before != undefined) {
+              initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), before);
+            }
+            else{
+              initialPathColor.delete(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
+            }
           }
 
           if (
@@ -571,16 +617,34 @@ clone() {
             this.p_star_list[p_xy.start][p_xy.end].remove((el) => el === p_xy);
             if (p_xy.r)
             {
-
-
               shortest +=`,L*(${_parsepath(p_xy.r,p_xy.r.start+1)})`;
               p_xy.r.L_star = (p_xy.r.L_star || []).filter((x) => x !== p_xy);
-            }
+              const before =initialPathColor.get(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.l ? `-${p_xy.r.l.start}-${p_xy.r.l.end}` : ""));
+              initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.l ? `-${p_xy.r.l.start}-${p_xy.r.l.end}` : ""), "blue");
+              saveGraphState(this, [p_xy], initialPathColor);
+              modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu najkratších predĺžení cesty (${_parsepath(p_xy.r,p_xy.r.start+1)})`);
+              if (before != undefined) {
+                initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""), before);
+              }
+              else{
+                initialPathColor.delete(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""));
+              }  
+          }
             if (p_xy.l)
             {
               shortest +=`,R*(${_parsepath(p_xy.l,p_xy.l.start+1)})`;
               p_xy.l.R_star = (p_xy.l.R_star || []).filter((x) => x !== p_xy);
-            }
+              const before =initialPathColor.get(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
+              initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), "blue");
+              saveGraphState(this, [p_xy], initialPathColor);
+              modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu najkratších predĺžení cesty (${_parsepath(p_xy.l,p_xy.l.start+1)})`);
+                        if (before != undefined) {
+                initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), before);
+              }
+              else{
+                initialPathColor.delete(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
+              }  
+          }
           }
         } catch (e) {
           console.log(e.message,e.cause);
@@ -608,6 +672,28 @@ clone() {
 
   fixup(v, w) {
     console.log("fixup", v, w);
+    const fixupLabels = labels.fixup || (labels.fixup = [[], [], []]);
+    fixupLabels.forEach(phaseLabels => phaseLabels.length = 0);
+    this.fixupSnapshots = [[], [], []];
+    const pathSignature = path => {
+      let signature = `${path.start}-${path.end}`;
+      let current = path;
+      while (current.r != null) {
+        current = current.r;
+        signature += `-${current.start}-${current.end}`;
+      }
+      return signature;
+    };
+    const saveFixupStep = (phaseIndex, label, paths, colors = new Map()) => {
+      const snapshot = saveGraphState(this, paths || [], colors);
+      this.savedStates.pop();
+      this.fixupSnapshots[phaseIndex].push(snapshot);
+      modifyPlaybackStepLabel(
+        fixupLabels[phaseIndex],
+        this.fixupSnapshots[phaseIndex].length - 1,
+        label
+      );
+    };
     const from =w[0].filter((a)=> a!== Infinity );
     const to =w[1].filter((a)=> a!== Infinity );
     addCodeLine(`fixup(${v+1},[${from }],[${to}]):`);
@@ -617,6 +703,7 @@ clone() {
     addCodeLine(`//infinity skipped`);
     addpadding();
 
+    let addedPaths = [];
     for (let u = 0; u < weight_from.length; u++) {
       if (u == v) {
         continue;
@@ -628,11 +715,23 @@ clone() {
         addCodeLine(`if ${v+1}->${u+1}<inf`);
         addpadding();
         let path = new Path(v, u);
+
         path.weight = w_vu;
         path.l = this.p_list[v][v].front();
         path.r = this.p_list[u][u].front();
-
-
+        addedPaths.push(path);
+        const pathColors = new Map([[pathSignature(path), "green"]]);
+        saveFixupStep(0, `vytváram cestu {${v+1},${u+1}} s váhou ${path.weight}`, addedPaths, pathColors);
+        addedPaths.push(path.l);
+        pathColors.set(pathSignature(path.l), "green");
+        saveFixupStep(0, `nastavím lavé skrátenie cesty {${v+1},${u+1}} l({${v+1},${u+1}}) <- {${v+1}} )`, addedPaths, pathColors);
+        pathColors.set(pathSignature(path.r), "green");
+        pathColors.delete(pathSignature(path.l));
+        saveFixupStep(0, `nastavím pravé skrátenie cesty {${v+1},${u+1}} r({${v+1},${u+1}}) <- {${u+1}} )`, addedPaths, pathColors);
+        pathColors.set(pathSignature(path.l), "green");
+        saveFixupStep(0, `pridám cestu  {${v+1},${u+1}} do Prioritného radu P(${v+1},${u+1})`, addedPaths, pathColors);
+        saveFixupStep(0, `pridám cestu predĺžení L(${u+1}) a R(${v+1})`, addedPaths, pathColors);
+        
         path.r?.L.push(path);
         path.l?.R.push(path);
         addCodeLine(`w({${v+1},${u+1}}) <- {${w_vu}}`);
@@ -641,10 +740,9 @@ clone() {
         //addhistory(this,new Map([[`${u}-${u}`,"green"],[`P${u}-${u}`,"green"]]));
         addCodeLine(`r({${v+1},${u+1}}) <- {${u+1}}`);
         this.p_list[v][u].enqueue(path);
+        addedPaths.push(path);
         //addhistory(this,new Map([[`${v}-${u}`,"green"],[`P${v}-${u}`,"green"]]));
         addCodeLine(`pridaj {${v+1},${u+1}} do P(${v+1},${u+1}), L({${u+1}}), R({${v+1}})`);
-
-
         shrinkpadding();
       }
 
@@ -659,7 +757,18 @@ clone() {
 
         path.l = this.p_list[u][u].front();
         path.r = this.p_list[v][v].front();
-
+        addedPaths.push(path);
+        const pathColors = new Map([[pathSignature(path), "green"]]);
+        saveFixupStep(0, `vytváram cestu {${u+1},${v+1}} s váhou ${path.weight}`, addedPaths, pathColors);
+        addedPaths.push(path.l);
+        pathColors.set(pathSignature(path.l), "green");
+        saveFixupStep(0, `nastavím lavé skrátenie cesty {${u+1},${v+1}} l({${u+1},${v+1}}) <- {${u+1}} )`, addedPaths, pathColors);
+        pathColors.set(pathSignature(path.r), "green");
+        pathColors.delete(pathSignature(path.l));
+        saveFixupStep(0, `nastavím pravé skrátenie cesty {${u+1},${v+1}} r({${u+1},${v+1}}) <- {${v+1}} )`, addedPaths, pathColors);
+        pathColors.set(pathSignature(path.l), "green");
+        saveFixupStep(0, `pridám cestu  {${u+1},${v+1}} do Prioritného radu P(${u+1},${v+1})`, addedPaths, pathColors);
+        saveFixupStep(0, `pridám cestu predĺžení L(${u+1}) a R(${v+1})`, addedPaths, pathColors);
 
 
         path.l?.R.push(path);
@@ -670,6 +779,7 @@ clone() {
         //addhistory(this,new Map([[`${v}-${v}`,"green"],[`P${v}-${v}`,"green"]]));
         addCodeLine(`r({${u+1},${v+1}}) <- {${v+1}}`);
         this.p_list[u][v].enqueue(path);
+        addedPaths.push(path);
         //addhistory(this,new Map([[`${u}-${v}`,"green"],[`P${u}-${v}`,"green"]]));
         addCodeLine(`pridaj ({${u+1},${v+1}}) do P(${u+1},${v+1}), L({${v+1}}), R({${u+1}})`);
 
@@ -678,13 +788,16 @@ clone() {
 
     }
     shrinkpadding();
+
     // ---------- phase 2 ----------
+   let pathColors = new Map();
     addCodeLine(`H <- prázdny rad`);
     const H = new MinPriorityQueue({
       compare: (a, b) => a.weight - b.weight,
     });
     addCodeLine(`foreach (x, y):`);
     addpadding();
+    const hPaths = [];
     for (let i = 0; i < this.p_list.length; i++) {
       for (let j = 0; j < this.p_list[i].length; j++) {
         const P = this.p_list[i][j];
@@ -694,20 +807,28 @@ clone() {
         {
           addCodeLine(`pridaj cestu {${_parsepath(P.front(),P.front().start+1)}} do H //nekonečno vynechané`);
         }
-
+        addedPaths.push(P.front());
+        pathColors.set(pathSignature(P.front()), "green");
+        saveFixupStep(1, `pridávam cestu {${_parsepath(P.front(),P.front().start+1)}} do H`, addedPaths, pathColors);
         H.enqueue(P.front());
+        hPaths.push(P.front());
       }
     }
     shrinkpadding();
+    saveFixupStep(1, `pridávam cesty do prioritného radu H`, hPaths, pathColors);
     // ---------- phase 3 ----------
 
     const n = this.p_list.length;
-
+    addedPaths = [];
+    pathColors = new Map();
     const visited = Array.from({ length: n }, () => Array(n).fill(false));
     addCodeLine(`while H != prázdny rad: //nekonečno vynechané`);
     addpadding();
     while (!H.isEmpty()) {
       const path_xy = H.dequeue();
+      addedPaths.push(path_xy);
+      pathColors.set(pathSignature(path_xy), "red");
+      saveFixupStep(2, `vyberiem cestu {${_parsepath(path_xy,path_xy.start+1)}} z H`, addedPaths, pathColors);
       if (this.path.start != this.path.end)
       {
         addCodeLine(`vyber cestu {${_parsepath(path_xy,path_xy.start+1)}}`);
@@ -718,8 +839,10 @@ clone() {
       if (visited[path_xy.start][path_xy.end]) continue;
       if (this.path.start != this.path.end)
       {
+        
       addCodeLine(`{${_parsepath(path_xy,path_xy.start+1)}} je prvá pre (${path_xy.start+1},${path_xy.end+1})`);
       }
+      //saveFixupStep(2, `keďže{${_parsepath(path_xy,path_xy.start+1)}} je prvá pre (${path_xy.start+1},${path_xy.end+1}) pridám ju do P(${path_xy.start+1},${path_xy.end+1})`, addedPaths, pathColors);
       addpadding();
       visited[path_xy.start][path_xy.end] = true;
       if (this.p_star_list[path_xy.start][path_xy.end].front() == null) {
@@ -731,11 +854,32 @@ clone() {
         console.log(path_xy);
         console.log(this.p_star_list[path_xy.start][path_xy.end]);
         this.p_star_list[path_xy.start][path_xy.end].enqueue(path_xy);
+        addedPaths.push(path_xy);
+        pathColors.set(pathSignature(path_xy), "green");
+        saveFixupStep(
+          2,
+          `pridávam cestu {${_parsepath(path_xy, path_xy.start + 1)}} do P*(${path_xy.start+1},${path_xy.end+1})`,
+          addedPaths,pathColors
+        );
         if (path_xy.l?.R_star?.indexOf(path_xy) == -1){
           path_xy.l?.R_star?.push(path_xy);
+          addedPaths.push(path_xy.l);
+          pathColors.set(pathSignature(path_xy.l), "green");
+          saveFixupStep(
+            2,
+            `pridávam cestu {${_parsepath(path_xy, path_xy.start + 1)}} do pravého predlženia R*({${_parsepath(path_xy.l,path_xy.l.start + 1)}})`,
+          addedPaths,pathColors
+          );
         }
         if (!path_xy.r?.L_star?.some(p => pathKey(p) === pathKey(path_xy))) {
           path_xy.r?.L_star?.push(path_xy);
+          addedPaths.push(path_xy.r);
+          pathColors.set(pathSignature(path_xy.r), "green");
+          saveFixupStep(
+            2,
+            `pridávam cestu {${_parsepath(path_xy, path_xy.start + 1)}} do lavého predlženia L*({${_parsepath(path_xy.r,path_xy.r.start + 1)}})`,
+          addedPaths,pathColors
+          );
         }
 
         // remove from P_list
@@ -766,9 +910,21 @@ clone() {
 
           path_new_xy.l = path_new_xb;
           path_new_xy.r = path_xy;
+          
+          saveFixupStep(
+            2,
+            `vytváram cestu {${_parsepath(path_new_xy, path_new_xy.start + 1)}} zlučením ciest  {${_parsepath(this.p_list[path_new_xb.start][path_xy.start].front(), this.p_list[path_new_xb.start][path_xy.start].front().start + 1)}} a {${_parsepath(path_xy, path_xy.start + 1)}}s váhou ${path_new_xy.weight} a skráteniami l({${_parsepath(path_new_xy.l, path_new_xy.l.start + 1)}}) a r({${_parsepath(path_new_xy.r, path_new_xy.r.start + 1)}})`,
+            [path_new_xy, path_new_xy.l, path_new_xy.r,this.p_list[path_new_xb.start][path_xy.start].front()],new Map([[pathSignature(path_new_xy), "green"], [pathSignature(path_new_xy.l), "green"], [pathSignature(path_new_xy.r), "green"], [pathSignature(this.p_list[path_new_xb.start][path_xy.start].front()), "green"]])
+          );
+          saveFixupStep(
+            2,
+            `pridávam cestu {${_parsepath(path_new_xy, path_new_xy.start + 1)}} do P(${path_new_xy.start+1},${path_new_xy.end+1}) a predĺženia cesty L({${_parsepath(path_xy, path_xy.start + 1)}}), R({${_parsepath(path_new_xb, path_new_xb.start + 1)}}) a H`,
+            [path_new_xy,path_xy,path_new_xb],new Map([[pathSignature(path_new_xy), "green"], [pathSignature(path_xy), "blue"], [pathSignature(path_new_xb), "blue"]])
+          );
           if (this.hasDuplicate(this.p_list[path_new_xy.start][path_new_xy.end], path_new_xy.l, path_new_xy.r)) continue;
           console.log("enqueueing", path_new_xy);
           this.p_list[path_new_xy.start][path_new_xy.end].enqueue(path_new_xy);
+
           path_xy.L.push(path_new_xy);
           path_new_xb.R.push(path_new_xy);
 
@@ -828,10 +984,21 @@ clone() {
 
           path_x_new_y.l = path_xy;
           path_x_new_y.r = path_a_new_y;
+
           if (this.hasDuplicate(this.p_list[path_x_new_y.start][path_x_new_y.end], path_x_new_y.l, path_x_new_y.r)) continue;
           console.log("enqueueing", path_x_new_y);
           this.p_list[path_x_new_y.start][path_x_new_y.end].enqueue(
             path_x_new_y,
+          );
+          saveFixupStep(
+            2,
+            `vytváram cestu {${_parsepath(path_x_new_y, path_x_new_y.start + 1)}} zlučením ciest {${_parsepath(path_xy, path_xy.start + 1)}} a {${_parsepath(this.p_list[path_xy.end][path_a_new_y.end].front(), this.p_list[path_xy.end][path_a_new_y.end].front().start + 1)}} s váhou ${path_x_new_y.weight} a skráteniami l({${_parsepath(path_x_new_y.l, path_x_new_y.l.start + 1)}}) a r({${_parsepath(path_x_new_y.r, path_x_new_y.r.start + 1)}})`,
+            [path_x_new_y,path_x_new_y.l,path_x_new_y.r,this.p_list[path_xy.end][path_a_new_y.end].front()],new Map([[pathSignature(path_x_new_y), "green"], [pathSignature(path_x_new_y.l), "green"], [pathSignature(path_x_new_y.r), "green"], [pathSignature(this.p_list[path_xy.end][path_a_new_y.end].front()), "green"]])
+          );
+          saveFixupStep(
+            2,
+            `pridávam cestu {${_parsepath(path_x_new_y, path_x_new_y.start + 1)}} do P(${path_x_new_y.start+1},${path_x_new_y.end+1}) a predĺženia cesty L({${_parsepath(path_a_new_y, path_a_new_y.start + 1)}}), R({${_parsepath(path_xy,path_xy.start + 1)}}) a H`,
+            [path_x_new_y,path_a_new_y,path_xy],new Map([[pathSignature(path_x_new_y), "green"], [pathSignature(path_a_new_y), "blue"], [pathSignature(path_xy), "blue"]])
           );
 
           path_a_new_y.L.push(path_x_new_y);
@@ -882,9 +1049,14 @@ clone() {
     }
 
     shrinkpadding();
+    if (this.fixupSnapshots[2].length === 0) {
+      saveFixupStep(2, `fixup 3 nebolo potrebné meniť`, []);
+    }
   }
 
   update(v, w) {
+    const graphBeforeCleanup = this.clone();
+    labels.length = 0;
     const updatedMatrix = this.edgeMatrix.map(row => [...row]);
     for (let u = 0; u < this.V; u++) {
       if (u === v) continue;
@@ -895,12 +1067,16 @@ clone() {
 
     this.checkUniqueShortestPaths(updatedMatrix);
     this.edgeMatrix = updatedMatrix;
+    this.savedStates = [];
 
     const from =w[0].filter((a)=> a!== Infinity );
     const to =w[1].filter((a)=> a!== Infinity );
     addCodeLine(`update(${v+1},[${from }],[${to}]): ////nekonečno vynechané`);
     addpadding();
     this.cleanup(v);
+    this.cleanupOriginal = graphBeforeCleanup;
+    this.cleanupSnapshot = this.clone();
+    this.fixupSnapshots = [];
     this.fixup(v, w);
     shrinkpadding();
   }

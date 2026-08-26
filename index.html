@@ -59,6 +59,13 @@
 
 
     <div>
+        <div id="playback-workspace" class="workspace is-hidden">
+            <div class="workspace-item">
+                <h2 class="workspace-label">Cieľ</h2>
+                <div id="playback-target" class="workspace-box"></div>
+            </div>
+        </div>
+
         <div id="cy" style="width: 60vh; height: 40vh; margin-left: 10vh;margin-right: 20vh; border: 1vh solid #ccc;"></div>
         <div style="margin-left: 8vh;">
         <button onclick="showName()">Nový graf</button>
@@ -124,6 +131,7 @@
         <label><input type="radio" name="mode1" value="NonL"> Lokálne najkratšie cesty</label>
     </div>
     <aside class="side-panel update-side-panel"  aria-label="Aktualizácie">
+        <h2 class="workspace-label">Kroky</h2>
         <div id="update-app"></div>
     </aside>
 </body>
