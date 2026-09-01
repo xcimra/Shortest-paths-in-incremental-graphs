@@ -158,76 +158,133 @@ function promptNumVertices() {
 function showInitialModePopup() {
   console.log("showInitialModePopup called");
   return new Promise(resolve => {
-  const overlay = document.createElement("div");
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.background = "rgba(0, 0, 0, 0.6)";
-  overlay.style.display = "flex";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.zIndex = "1000";
+    const overlay = document.createElement("div");
+    overlay.style.position = "fixed";
+    overlay.style.inset = "0";
+    overlay.style.background = "rgba(0, 0, 0, 0.6)";
+    overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.zIndex = "1000";
 
-  const dialog = document.createElement("div");
-  dialog.style.background = "#fff";
-  dialog.style.borderRadius = "12px";
-  dialog.style.padding = "24px";
-  dialog.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
-  dialog.style.maxWidth = "420px";
-  dialog.style.textAlign = "center";
+    const dialog = document.createElement("div");
+    dialog.style.background = "#fff";
+    dialog.style.borderRadius = "12px";
+    dialog.style.padding = "24px";
+    dialog.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+    dialog.style.maxWidth = "420px";
+    dialog.style.textAlign = "center";
 
-  const title = document.createElement("h3");
-  title.textContent = "Chcete použiť príklad alebo zadať hrany manuálne?";
-  title.style.margin = "0 0 16px";
+    const title = document.createElement("h3");
+    title.textContent = "Chcete použiť príklad alebo zadať hrany manuálne?";
+    title.style.margin = "0 0 16px";
 
-  const buttonRow = document.createElement("div");
-  buttonRow.style.display = "flex";
-  buttonRow.style.justifyContent = "center";
-  buttonRow.style.gap = "12px";
+    const buttonRow = document.createElement("div");
+    buttonRow.style.display = "flex";
+    buttonRow.style.justifyContent = "center";
+    buttonRow.style.gap = "12px";
 
-  const manualButton = document.createElement("button");
-  manualButton.textContent = "manualne";
-  manualButton.onclick = async () => {
-    overlay.remove();
-    const vertexCount = await promptNumVertices();
-    if (vertexCount === null) {
-      resolve(false);
-      return;
-    }
-    edge_matrix = promptManualEdges();
-    console.log("Manual edges matrix:", edge_matrix);
-    resolve(true);
-  };
+    const manualButton = document.createElement("button");
+    manualButton.textContent = "manualne";
+    manualButton.onclick = async () => {
+      overlay.remove();
+      const vertexCount = await promptNumVertices();
+      if (vertexCount === null) {
+        resolve(false);
+        return;
+      }
+      edge_matrix = promptManualEdges();
+      console.log("Manual edges matrix:", edge_matrix);
+      resolve(true);
+    };
 
-  const exampleButton = document.createElement("button");
-  exampleButton.textContent = "príklad";
-  exampleButton.onclick = () => {
-    overlay.remove();
-    numVertices = 3;
+    const exampleButton = document.createElement("button");
+    exampleButton.textContent = "príklad";
+    exampleButton.onclick = () => {
+      overlay.remove();
 
-    const before = currentMode;
-    currentMode = "hrana";
-    try {
-      const vertexCount = 3;
-      edge_matrix = [[0, 3, Infinity],
-                     [10, 0, 4],
-                     [5, Infinity, 0]];
-      //doupdate(1, "2:3,3:2", "");
-      //doupdate(2, "4:2", "1:3");
-      //doupdate(3, "4:1", "1:2");
-    } finally {
-      currentMode = before;
-    }
-    resolve(true);
-  };
+      const sizeOverlay = document.createElement("div");
+      sizeOverlay.style.position = "fixed";
+      sizeOverlay.style.inset = "0";
+      sizeOverlay.style.background = "rgba(0, 0, 0, 0.6)";
+      sizeOverlay.style.display = "flex";
+      sizeOverlay.style.alignItems = "center";
+      sizeOverlay.style.justifyContent = "center";
+      sizeOverlay.style.zIndex = "1001";
 
-  buttonRow.appendChild(manualButton);
-  buttonRow.appendChild(exampleButton);
-  dialog.appendChild(title);
-  dialog.appendChild(buttonRow);
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
+      const sizeDialog = document.createElement("div");
+      sizeDialog.style.background = "#fff";
+      sizeDialog.style.borderRadius = "12px";
+      sizeDialog.style.padding = "24px";
+      sizeDialog.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
+      sizeDialog.style.maxWidth = "420px";
+      sizeDialog.style.width = "100%";
+      sizeDialog.style.textAlign = "center";
+
+      const sizeTitle = document.createElement("h3");
+      sizeTitle.textContent = "Vyberte počet vrcholov príkladu:";
+      sizeTitle.style.margin = "0 0 16px";
+
+      const sizeButtons = document.createElement("div");
+      sizeButtons.style.display = "flex";
+      sizeButtons.style.justifyContent = "center";
+      sizeButtons.style.gap = "10px";
+      sizeButtons.style.flexWrap = "wrap";
+
+      const buildExampleMatrix = (size) => {
+        const matrix = Array.from({ length: size }, () => Array(size).fill(Infinity));
+        for (let i = 0; i < size; i++) {
+          matrix[i][i] = 0;
         }
-    );
+
+        if (size === 3) {
+          return [
+            [0, 3, Infinity],
+            [10, 0, 4],
+            [5, Infinity, 0]
+          ];
+        }
+
+        for (let i = 0; i < size - 1; i++) {
+          matrix[i][i + 1] = 2 + i;
+        }
+        return matrix;
+      };
+
+      [3, 6, 9].forEach(size => {
+        const sizeButton = document.createElement("button");
+        sizeButton.type = "button";
+        sizeButton.textContent = `${size} vrcholov`;
+        sizeButton.onclick = () => {
+          sizeOverlay.remove();
+          numVertices = size;
+
+          const before = currentMode;
+          currentMode = "hrana";
+          try {
+            edge_matrix = buildExampleMatrix(size);
+          } finally {
+            currentMode = before;
+          }
+          resolve(true);
+        };
+
+        sizeButtons.appendChild(sizeButton);
+      });
+
+      sizeDialog.appendChild(sizeTitle);
+      sizeDialog.appendChild(sizeButtons);
+      sizeOverlay.appendChild(sizeDialog);
+      document.body.appendChild(sizeOverlay);
+    };
+
+    buttonRow.appendChild(manualButton);
+    buttonRow.appendChild(exampleButton);
+    dialog.appendChild(title);
+    dialog.appendChild(buttonRow);
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+  });
 }
 
 const squareData = [
