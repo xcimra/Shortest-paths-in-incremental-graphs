@@ -254,7 +254,7 @@ function showInitialModePopup() {
       [3, 6, 9].forEach(size => {
         const sizeButton = document.createElement("button");
         sizeButton.type = "button";
-        sizeButton.textContent = `${size} vrcholov`;
+        sizeButton.textContent = `${size}`+ (size === 3 ? " vrcholy" : " vrcholov");
         sizeButton.onclick = () => {
           sizeOverlay.remove();
           numVertices = size;
@@ -554,6 +554,11 @@ function restoreMainGraphPerspective() {
   const graphRadio = document.querySelector('input[name="cyPerspective"][value="graph"]');
   if (graphRadio) graphRadio.checked = true;
 
+  changeSquareAppearance(0, "Najkratšie cesty", "#999", false);
+  changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B", false);
+  changeSquareAppearance(2, "", "#7bd389", true);
+  changeSquareAppearance(3, "Cesta s predĺžením", "blue", true);
+
   if (graph) {
     updateCytoscapeEdges(graph);
   }
@@ -593,6 +598,18 @@ const updateCardsApp = Vue.createApp({
         const phaseIndex = Number(phase.key.slice(-1)) - 1;
         const phaseSnapshots = update.fixupSnapshots?.[phaseIndex] || [];
         const snapshot = phaseSnapshots[phaseSnapshots.length - 1];
+        let baselineGraph = update.cleanupSnapshot?.graph || null;
+
+        if (phase.key === "fixup-2") {
+          const previousPhase = update.fixupSnapshots?.[0] || [];
+          const previousSnapshot = previousPhase[previousPhase.length - 1];
+          baselineGraph = previousSnapshot?.graph || baselineGraph;
+        } else if (phase.key === "fixup-3") {
+          const previousPhase = update.fixupSnapshots?.[1] || [];
+          const previousSnapshot = previousPhase[previousPhase.length - 1];
+          baselineGraph = previousSnapshot?.graph || baselineGraph;
+        }
+
         if (phase.key === "fixup-1") {
           changeSquareAppearance(0, "pridané hrany", "green");
           changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B", true);
@@ -604,7 +621,6 @@ const updateCardsApp = Vue.createApp({
           changeSquareAppearance(2, "cesty pridané do radu H", "green", true);
         }
         else if (phase.key === "fixup-3") {
-      
           changeSquareAppearance(0, "Najkratšie cesty", "#999");
           changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B");
           changeSquareAppearance(2, "Ostatné cesty", "green");
@@ -615,7 +631,7 @@ const updateCardsApp = Vue.createApp({
           null,
           null,
           phase.key,
-          update.cleanupSnapshot?.graph || null,
+          baselineGraph,
           snapshot.paths,
           snapshot.colors
         );
@@ -629,7 +645,7 @@ const updateCardsApp = Vue.createApp({
       updateCytoscapeEdges(graph);
       changeSquareAppearance(0, "Najkratšie cesty", "#999", false);
       changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B", false);
-      changeSquareAppearance(2, "Odstránené cesty", "red", true);
+      changeSquareAppearance(2, "", "#7bd389", true);
       changeSquareAppearance(3, "Cesta s predĺžením", "blue", true);
       this.closePlayback();
     },
@@ -1613,9 +1629,7 @@ export function updateCytoscapeEdgesCode(
         const key = `${u-1}-${v-1}`;
         const explicitColor = getPathColor(path);
         let color = explicitColor || getPathEdgeColor(graph, path);
-        if (!explicitColor && highlightMode === "fixup-2") {
-          color = "#16803c";
-        } else if (!explicitColor && highlightMode === "fixup-1" && !baselinePaths.has(pathSignature(path))) {
+        if (!explicitColor && (highlightMode === "fixup-1" || highlightMode === "fixup-2" || highlightMode === "fixup-3") && !baselinePaths.has(pathSignature(path))) {
           color = "#16803c";
         }
 
