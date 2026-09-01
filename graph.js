@@ -1,6 +1,6 @@
 import { MinPriorityQueue } from "https://cdn.skypack.dev/@datastructures-js/priority-queue";
 import { addpadding,shrinkpadding,addhistory, addCodeLine } from "./editor.js";
-import { saveGraphState, modifyPlaybackStepLabel, labels } from "./main.js";
+import { saveGraphState, modifyPlaybackStepLabel, labels,assignPlaybackStepSquareLabel } from "./main.js";
 export class Path {
   constructor(start, end) {
     this.node_p = null;
@@ -19,7 +19,7 @@ export class Path {
 function pathKey(p) {
   return _parsepath(p, p.start);
 }
-function _parsepath(result, startstring) {
+export function _parsepath(result, startstring) {
   let pathstring = startstring;
 
   while (result.r != null) {
@@ -78,6 +78,8 @@ constructor(vertices, matrix = null, logger = () => {}) {
         this.initializeFromMatrix(matrix);
         //this.initializeLocallyShortestPaths();
     }
+    changeSquareAppearance(0, "Najkratšie cesty", "#999");
+    changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B");
 }
 createIncomingEdges(matrix) {
     const n = matrix.length;
@@ -488,23 +490,46 @@ clone() {
   cleanup(v) {
     addCodeLine(`cleanup(${v+1}):`);
     addpadding();
+
     const Q = [];
 
     if (!this.p_list[v][v] || this.p_list[v][v].isEmpty())
       {
         shrinkpadding();
         return;
+      
       }
+    const pathSignature = path => {
+      let signature = `${path.start}-${path.end}`;
+      let current = path;
+      while (current.r != null) {
+        current = current.r;
+        signature += `-${current.start}-${current.end}`;
+      }
+      return signature;
+    };
     const originalState = this.clone();
     const initialPath = this.p_list[v][v].front();
-    const initialPathColor = new Map([[
-      `${initialPath.start}-${initialPath.end}` +
-      (initialPath.r ? `-${initialPath.r.start}-${initialPath.r.end}` : ""),
-      "green"
-    ]]);
-    saveGraphState(this, [initialPath], initialPathColor);
+    const initialPathColor = new Map();
+    initialPathColor.set(pathSignature(initialPath),"green")
+
     let stepLabelCount = 0;
+    assignPlaybackStepSquareLabel(
+    stepLabelCount,
+    "cleanup",
+    "Najkratšie cesty",
+    "Lokálne najkratšie cesty",
+    "Jednovrcholová cesta v rade",
+    "#999",
+    "#FF851B",
+    "green",
+    false,
+    false,
+    false
+  );
+      saveGraphState(this, [initialPath], initialPathColor);
     modifyPlaybackStepLabel(labels, stepLabelCount++, `inicializujem rad Q s cestou {${_parsepath(initialPath, initialPath.start + 1)}}`);
+
     if(!Q.includes(initialPath))
     {
         Q.push(initialPath);
@@ -516,11 +541,24 @@ clone() {
     addpadding();
     while (Q.length !== 0) {
       const p = Q.shift(); // match deque  FIFO behavior
-      initialPathColor.set(`${p.start}-${p.end}` + (p.r ? `-${p.r.start}-${p.r.end}` : ""), "red");
+      assignPlaybackStepSquareLabel(
+      stepLabelCount,
+      "cleanup",
+      "Najkratšie cesty",
+      "Lokálne najkratšie cesty",
+      "Odstránená cesta z radu",
+      "#999",
+      "#FF851B",
+      "red",
+      false,
+      false,
+      false
+      );
+      initialPathColor.set(pathSignature(p), "red");
       modifyPlaybackStepLabel(labels, stepLabelCount++, `odstránim cestu {${_parsepath(p , p .start + 1)}} z Q`);
       saveGraphState(this, [p], initialPathColor);
       if (p.start === p.end && p.l === null && p.r === null) {
-        initialPathColor.delete(`${p.start}-${p.end}` + (p.r ? `-${p.r.start}-${p.r.end}` : ""));
+        initialPathColor.delete(pathSignature(p));
       }
       addCodeLine(`vyber cestu {${_parsepath(p,p.start+1)}}`);
       if (!p) continue;
@@ -529,11 +567,26 @@ clone() {
       let paths =neighbors.map((p) => `{${_parsepath(p,p.start+1)}},`)
       addCodeLine(`foreach pxy v {${paths}}`);
       addpadding();
+
       for (const p_xy of neighbors) {
         if (!p_xy) continue;
-        initialPathColor.set(`${p_xy.start}-${p_xy.end}` + (p_xy.r ? `-${p_xy.r.start}-${p_xy.r.end}` : ""), "green");
+        initialPathColor.set(pathSignature(p_xy), "green");
+        assignPlaybackStepSquareLabel(
+        stepLabelCount,
+        "cleanup",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Nájdená cesta pridaná do radu",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false
+        );
         saveGraphState(this, [p_xy], initialPathColor);
-        modifyPlaybackStepLabel(labels, stepLabelCount++, `pridám cestu {${_parsepath(p_xy,p_xy.start+1)}} predĺženú o jeden vrchol do Q`);
+        modifyPlaybackStepLabel(labels, stepLabelCount++, `pridám cestu {${_parsepath(p_xy,p_xy.start+1)}} do Q`);
+
         addCodeLine(`pridaj {${_parsepath(p_xy,p_xy.start+1)}} do Q`);
         if(!Q.includes(p_xy))
         {
@@ -558,7 +611,21 @@ clone() {
 
           //addhistory(this, map);
           this.p_list[p_xy.start][p_xy.end].remove((el) => el === p_xy);
-          initialPathColor.set(`${p_xy.start}-${p_xy.end}` + (p_xy.r ? `-${p_xy.r.start}-${p_xy.r.end}` : ""), "red");
+          initialPathColor.set(pathSignature(p_xy), "red");
+          assignPlaybackStepSquareLabel(
+          stepLabelCount,
+          "cleanup",
+          "Najkratšie cesty",
+          "Lokálne najkratšie cesty",
+          "Odstránená cesta",
+          "#999",
+          "#FF851B",
+          "red",
+          false,
+          false,
+          false,
+
+          );
           saveGraphState(this, [p_xy], initialPathColor);
           modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} z prioritného radu lokálne najkratších ciest`);
 
@@ -568,30 +635,58 @@ clone() {
 
             line +=`,L(${_parsepath(p_xy.r,p_xy.r.start+1)})`;
             p_xy.r.L = (p_xy.r.L || []).filter((x) => x !== p_xy);
-            const before =initialPathColor.get(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""));
-            initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""), "blue");
+            const before =initialPathColor.get(pathSignature(p_xy.r));
+            initialPathColor.set(pathSignature(p_xy.r), "blue");
+            assignPlaybackStepSquareLabel(
+            stepLabelCount,
+            "cleanup",
+            "Najkratšie cesty",
+            "Lokálne najkratšie cesty",
+            "Odstránená cesta",
+            "#999",
+            "#FF851B",
+            "red",
+            false,
+            false,
+            false,
+            false
+            );
             saveGraphState(this, [p_xy], initialPathColor);
-            modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu predĺžení cesty (${_parsepath(p_xy.r,p_xy.r.start+1)})`);
+            modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu lokálne najkratších predĺžení cesty (${_parsepath(p_xy.r,p_xy.r.start+1)})`);
             if (before != undefined) {
-              initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""), before);
+              initialPathColor.set(pathSignature(p_xy.r), before);
             }
             else{
-              initialPathColor.delete(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""));
+              initialPathColor.delete(pathSignature(p_xy.r));
             }
           }
           if (p_xy.l) {
             line +=`,R(${_parsepath(p_xy.l,p_xy.l.start+1)})`;
             p_xy.l.R = (p_xy.l.R || []).filter((x) => x !== p_xy);
             p_xy.r.L = (p_xy.r.L || []).filter((x) => x !== p_xy);
-            const before =initialPathColor.get(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
-            initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), "blue");
+            const before =initialPathColor.get(pathSignature(p_xy.l));
+            initialPathColor.set(pathSignature(p_xy.l), "blue");
+            assignPlaybackStepSquareLabel(
+            stepLabelCount,
+            "cleanup",
+            "Najkratšie cesty",
+            "Lokálne najkratšie cesty",
+            "Odstránená cesta",
+            "#999",
+            "#FF851B",
+            "red",
+            false,
+            false,
+            false,
+            false
+            );
             saveGraphState(this, [p_xy], initialPathColor);
             modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu lokálne najkratších predĺžení cesty (${_parsepath(p_xy.l,p_xy.l.start+1)})`);
             if (before != undefined) {
-              initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), before);
+              initialPathColor.set(pathSignature(p_xy.l), before);
             }
             else{
-              initialPathColor.delete(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
+              initialPathColor.delete(pathSignature(p_xy.l));
             }
           }
 
@@ -619,30 +714,60 @@ clone() {
             {
               shortest +=`,L*(${_parsepath(p_xy.r,p_xy.r.start+1)})`;
               p_xy.r.L_star = (p_xy.r.L_star || []).filter((x) => x !== p_xy);
-              const before =initialPathColor.get(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.l ? `-${p_xy.r.l.start}-${p_xy.r.l.end}` : ""));
-              initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.l ? `-${p_xy.r.l.start}-${p_xy.r.l.end}` : ""), "blue");
+              const before =initialPathColor.get(pathSignature(p_xy.r));
+              initialPathColor.set(pathSignature(p_xy.r), "blue");
+              
+              assignPlaybackStepSquareLabel(
+              stepLabelCount,
+              "cleanup",
+              "Najkratšie cesty",
+              "Lokálne najkratšie cesty",
+              "Odstránená cesta",
+              "#999",
+              "#FF851B",
+              "red",
+              false,
+              false,
+              false,
+              false
+              );
               saveGraphState(this, [p_xy], initialPathColor);
               modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu najkratších predĺžení cesty (${_parsepath(p_xy.r,p_xy.r.start+1)})`);
               if (before != undefined) {
-                initialPathColor.set(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""), before);
+                initialPathColor.set(pathSignature(p_xy.r), before);
               }
               else{
-                initialPathColor.delete(`${p_xy.r.start}-${p_xy.r.end}` + (p_xy.r.r ? `-${p_xy.r.r.start}-${p_xy.r.r.end}` : ""));
+                initialPathColor.delete(pathSignature(p_xy.r));
               }  
           }
             if (p_xy.l)
             {
               shortest +=`,R*(${_parsepath(p_xy.l,p_xy.l.start+1)})`;
               p_xy.l.R_star = (p_xy.l.R_star || []).filter((x) => x !== p_xy);
-              const before =initialPathColor.get(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
-              initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), "blue");
+              const before =initialPathColor.get(pathSignature(p_xy.l));
+              initialPathColor.set(pathSignature(p_xy.l), "blue");
+
+              assignPlaybackStepSquareLabel(
+              stepLabelCount,
+              "cleanup",
+              "Najkratšie cesty",
+              "Lokálne najkratšie cesty",
+              "Odstránená cesta",
+              "#999",
+              "#FF851B",
+              "red",
+              false,
+              false,
+              false,
+              false
+              );
               saveGraphState(this, [p_xy], initialPathColor);
               modifyPlaybackStepLabel(labels, stepLabelCount++, `Odstránim cestu {${_parsepath(p_xy,p_xy.start+1)}} zo zoznamu najkratších predĺžení cesty (${_parsepath(p_xy.l,p_xy.l.start+1)})`);
                         if (before != undefined) {
-                initialPathColor.set(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""), before);
+                initialPathColor.set(pathSignature(p_xy.l), before);
               }
               else{
-                initialPathColor.delete(`${p_xy.l.start}-${p_xy.l.end}` + (p_xy.l.l ? `-${p_xy.l.l.start}-${p_xy.l.l.end}` : ""));
+                initialPathColor.delete(pathSignature(p_xy.l));
               }  
           }
           }
@@ -668,6 +793,7 @@ clone() {
     console.log("cleanup done");
     console.log(this.p_list);
     console.log(this.p_star_list);
+
   }
 
   fixup(v, w) {
@@ -704,6 +830,9 @@ clone() {
     addpadding();
 
     let addedPaths = [];
+    const fixupOnePaths = [];
+    const fixupOneColors = new Map();
+    let phaseOneCounter = 0;
     for (let u = 0; u < weight_from.length; u++) {
       if (u == v) {
         continue;
@@ -719,17 +848,94 @@ clone() {
         path.weight = w_vu;
         path.l = this.p_list[v][v].front();
         path.r = this.p_list[u][u].front();
+        fixupOnePaths.push(path);
+        fixupOneColors.set(pathSignature(path), "green");
         addedPaths.push(path);
         const pathColors = new Map([[pathSignature(path), "green"]]);
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false
+        );
+
         saveFixupStep(0, `vytváram cestu {${v+1},${u+1}} s váhou ${path.weight}`, addedPaths, pathColors);
         addedPaths.push(path.l);
-        pathColors.set(pathSignature(path.l), "green");
+        pathColors.set(pathSignature(path.l), "blue");
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "skrátenie"
+        );
         saveFixupStep(0, `nastavím lavé skrátenie cesty {${v+1},${u+1}} l({${v+1},${u+1}}) <- {${v+1}} )`, addedPaths, pathColors);
-        pathColors.set(pathSignature(path.r), "green");
+        pathColors.set(pathSignature(path.r), "blue");
         pathColors.delete(pathSignature(path.l));
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "skrátenie"
+        );
+
         saveFixupStep(0, `nastavím pravé skrátenie cesty {${v+1},${u+1}} r({${v+1},${u+1}}) <- {${u+1}} )`, addedPaths, pathColors);
-        pathColors.set(pathSignature(path.l), "green");
+        pathColors.set(pathSignature(path.l), "blue");
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "skrátenia"
+        );
         saveFixupStep(0, `pridám cestu  {${v+1},${u+1}} do Prioritného radu P(${v+1},${u+1})`, addedPaths, pathColors);
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "cesty s pridaným predĺžením"
+        );
         saveFixupStep(0, `pridám cestu predĺžení L(${u+1}) a R(${v+1})`, addedPaths, pathColors);
         
         path.r?.L.push(path);
@@ -757,17 +963,94 @@ clone() {
 
         path.l = this.p_list[u][u].front();
         path.r = this.p_list[v][v].front();
+        fixupOnePaths.push(path);
+        fixupOneColors.set(pathSignature(path), "green");
         addedPaths.push(path);
         const pathColors = new Map([[pathSignature(path), "green"]]);
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false
+        );
         saveFixupStep(0, `vytváram cestu {${u+1},${v+1}} s váhou ${path.weight}`, addedPaths, pathColors);
         addedPaths.push(path.l);
-        pathColors.set(pathSignature(path.l), "green");
+        pathColors.set(pathSignature(path.l), "blue");
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "skrátenie"
+        );
+
         saveFixupStep(0, `nastavím lavé skrátenie cesty {${u+1},${v+1}} l({${u+1},${v+1}}) <- {${u+1}} )`, addedPaths, pathColors);
-        pathColors.set(pathSignature(path.r), "green");
+        pathColors.set(pathSignature(path.r), "blue");
         pathColors.delete(pathSignature(path.l));
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "skrátenie"
+        );
+
         saveFixupStep(0, `nastavím pravé skrátenie cesty {${u+1},${v+1}} r({${u+1},${v+1}}) <- {${v+1}} )`, addedPaths, pathColors);
-        pathColors.set(pathSignature(path.l), "green");
+        pathColors.set(pathSignature(path.l), "blue");
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "skrátenia"
+        );
         saveFixupStep(0, `pridám cestu  {${u+1},${v+1}} do Prioritného radu P(${u+1},${v+1})`, addedPaths, pathColors);
+        assignPlaybackStepSquareLabel(
+        phaseOneCounter++,
+        "fixup-1",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Vytvorená hrana",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "cesty s pridaným predĺžením"
+        );
         saveFixupStep(0, `pridám cestu predĺžení L(${u+1}) a R(${v+1})`, addedPaths, pathColors);
 
 
@@ -788,6 +1071,7 @@ clone() {
 
     }
     shrinkpadding();
+    saveFixupStep(0, `pridávam všetky aktualizované hrany`, fixupOnePaths, fixupOneColors);
 
     // ---------- phase 2 ----------
    let pathColors = new Map();
@@ -798,6 +1082,7 @@ clone() {
     addCodeLine(`foreach (x, y):`);
     addpadding();
     const hPaths = [];
+    let phaseTwoCounter = 0;
     for (let i = 0; i < this.p_list.length; i++) {
       for (let j = 0; j < this.p_list[i].length; j++) {
         const P = this.p_list[i][j];
@@ -809,26 +1094,55 @@ clone() {
         }
         addedPaths.push(P.front());
         pathColors.set(pathSignature(P.front()), "green");
+        assignPlaybackStepSquareLabel(
+        phaseTwoCounter++,
+        "fixup-2",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Cesty v rade H",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        );
         saveFixupStep(1, `pridávam cestu {${_parsepath(P.front(),P.front().start+1)}} do H`, addedPaths, pathColors);
         H.enqueue(P.front());
         hPaths.push(P.front());
       }
     }
     shrinkpadding();
-    saveFixupStep(1, `pridávam cesty do prioritného radu H`, hPaths, pathColors);
+    //saveFixupStep(1, `pridávam cesty do prioritného radu H`, hPaths, pathColors);
     // ---------- phase 3 ----------
 
     const n = this.p_list.length;
     addedPaths = [];
     pathColors = new Map();
+    const discoveredFixup3Colors = new Map();
     const visited = Array.from({ length: n }, () => Array(n).fill(false));
     addCodeLine(`while H != prázdny rad: //nekonečno vynechané`);
     addpadding();
+    let stepcounter =0;
     while (!H.isEmpty()) {
       const path_xy = H.dequeue();
       addedPaths.push(path_xy);
-      pathColors.set(pathSignature(path_xy), "red");
+      assignPlaybackStepSquareLabel(
+      stepcounter,
+      "fixup-3",
+      "Najkratšie cesty",
+      "Lokálne najkratšie cesty",
+      "cesty s pridaným predĺžením",
+      "#999",
+      "#FF851B",
+      "green",
+      false,
+      false,
+      true
+      );
       saveFixupStep(2, `vyberiem cestu {${_parsepath(path_xy,path_xy.start+1)}} z H`, addedPaths, pathColors);
+
+      stepcounter++;
       if (this.path.start != this.path.end)
       {
         addCodeLine(`vyber cestu {${_parsepath(path_xy,path_xy.start+1)}}`);
@@ -854,8 +1168,21 @@ clone() {
         console.log(path_xy);
         console.log(this.p_star_list[path_xy.start][path_xy.end]);
         this.p_star_list[path_xy.start][path_xy.end].enqueue(path_xy);
-        addedPaths.push(path_xy);
-        pathColors.set(pathSignature(path_xy), "green");
+        assignPlaybackStepSquareLabel(
+        stepcounter,
+        "fixup-3",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Novoobjavená najkratšia cesta",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false
+        );
+        stepcounter++;
+        pathColors.set(pathSignature(path_xy),"green");
         saveFixupStep(
           2,
           `pridávam cestu {${_parsepath(path_xy, path_xy.start + 1)}} do P*(${path_xy.start+1},${path_xy.end+1})`,
@@ -863,23 +1190,52 @@ clone() {
         );
         if (path_xy.l?.R_star?.indexOf(path_xy) == -1){
           path_xy.l?.R_star?.push(path_xy);
-          addedPaths.push(path_xy.l);
-          pathColors.set(pathSignature(path_xy.l), "green");
+        pathColors.set(pathSignature(path_xy.l),"blue");
+        assignPlaybackStepSquareLabel(
+        stepcounter,
+        "fixup-3",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Cesta s pridaným predĺžením",
+        "#999",
+        "#FF851B",
+        "blue",
+        false,
+        false,
+        false
+        );
+        stepcounter++;
           saveFixupStep(
             2,
             `pridávam cestu {${_parsepath(path_xy, path_xy.start + 1)}} do pravého predlženia R*({${_parsepath(path_xy.l,path_xy.l.start + 1)}})`,
-          addedPaths,pathColors
+          addedPaths, new Map(pathColors)
           );
+          pathColors.delete(pathSignature(path_xy.l));
         }
         if (!path_xy.r?.L_star?.some(p => pathKey(p) === pathKey(path_xy))) {
           path_xy.r?.L_star?.push(path_xy);
-          addedPaths.push(path_xy.r);
-          pathColors.set(pathSignature(path_xy.r), "green");
+        pathColors.set(pathSignature(path_xy.r),"blue");
+
+        assignPlaybackStepSquareLabel(
+        stepcounter,
+        "fixup-3",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Cesta s pridaným predĺžením",
+        "#999",
+        "#FF851B",
+        "blue",
+        false,
+        false,
+        false
+        );
+                stepcounter++;
           saveFixupStep(
             2,
             `pridávam cestu {${_parsepath(path_xy, path_xy.start + 1)}} do lavého predlženia L*({${_parsepath(path_xy.r,path_xy.r.start + 1)}})`,
-          addedPaths,pathColors
+          addedPaths, new Map(pathColors)
           );
+          pathColors.delete(pathSignature(path_xy.r));
         }
 
         // remove from P_list
@@ -910,12 +1266,44 @@ clone() {
 
           path_new_xy.l = path_new_xb;
           path_new_xy.r = path_xy;
-          
+        assignPlaybackStepSquareLabel(
+        stepcounter,
+        "fixup-3",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Nová Cesta",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "Zlúčené cesty"
+        );
+          stepcounter++;
+
           saveFixupStep(
             2,
             `vytváram cestu {${_parsepath(path_new_xy, path_new_xy.start + 1)}} zlučením ciest  {${_parsepath(this.p_list[path_new_xb.start][path_xy.start].front(), this.p_list[path_new_xb.start][path_xy.start].front().start + 1)}} a {${_parsepath(path_xy, path_xy.start + 1)}}s váhou ${path_new_xy.weight} a skráteniami l({${_parsepath(path_new_xy.l, path_new_xy.l.start + 1)}}) a r({${_parsepath(path_new_xy.r, path_new_xy.r.start + 1)}})`,
-            [path_new_xy, path_new_xy.l, path_new_xy.r,this.p_list[path_new_xb.start][path_xy.start].front()],new Map([[pathSignature(path_new_xy), "green"], [pathSignature(path_new_xy.l), "green"], [pathSignature(path_new_xy.r), "green"], [pathSignature(this.p_list[path_new_xb.start][path_xy.start].front()), "green"]])
+            [path_new_xy, this.p_list[path_new_xb.start][path_xy.start].front(),path_xy],new Map([[pathSignature(path_new_xy), "green"], [pathSignature(this.p_list[path_new_xb.start][path_xy.start].front()), "blue"],[pathSignature(this.p_list[path_xy.start][path_xy.end].front()), "blue"]])
           );
+          
+          assignPlaybackStepSquareLabel(
+          stepcounter,
+          "fixup-3",
+          "Najkratšie cesty",
+          "Lokálne najkratšie cesty",
+          "Nová Cesta",
+          "#999",
+          "#FF851B",
+          "green",
+          false,
+          false,
+          false,
+          false,"cesty s pridaným predĺžením"
+          );
+          stepcounter++;
           saveFixupStep(
             2,
             `pridávam cestu {${_parsepath(path_new_xy, path_new_xy.start + 1)}} do P(${path_new_xy.start+1},${path_new_xy.end+1}) a predĺženia cesty L({${_parsepath(path_xy, path_xy.start + 1)}}), R({${_parsepath(path_new_xb, path_new_xb.start + 1)}}) a H`,
@@ -924,6 +1312,7 @@ clone() {
           if (this.hasDuplicate(this.p_list[path_new_xy.start][path_new_xy.end], path_new_xy.l, path_new_xy.r)) continue;
           console.log("enqueueing", path_new_xy);
           this.p_list[path_new_xy.start][path_new_xy.end].enqueue(path_new_xy);
+          discoveredFixup3Colors.set(pathSignature(path_new_xy), "green");
 
           path_xy.L.push(path_new_xy);
           path_new_xb.R.push(path_new_xy);
@@ -990,11 +1379,44 @@ clone() {
           this.p_list[path_x_new_y.start][path_x_new_y.end].enqueue(
             path_x_new_y,
           );
+          discoveredFixup3Colors.set(pathSignature(path_x_new_y), "green");
+          
+       assignPlaybackStepSquareLabel(
+        stepcounter,
+        "fixup-3",
+        "Najkratšie cesty",
+        "Lokálne najkratšie cesty",
+        "Nová Cesta",
+        "#999",
+        "#FF851B",
+        "green",
+        false,
+        false,
+        false,
+        false,
+        "Zlúčené cesty"
+        );
+          stepcounter++;
           saveFixupStep(
             2,
             `vytváram cestu {${_parsepath(path_x_new_y, path_x_new_y.start + 1)}} zlučením ciest {${_parsepath(path_xy, path_xy.start + 1)}} a {${_parsepath(this.p_list[path_xy.end][path_a_new_y.end].front(), this.p_list[path_xy.end][path_a_new_y.end].front().start + 1)}} s váhou ${path_x_new_y.weight} a skráteniami l({${_parsepath(path_x_new_y.l, path_x_new_y.l.start + 1)}}) a r({${_parsepath(path_x_new_y.r, path_x_new_y.r.start + 1)}})`,
-            [path_x_new_y,path_x_new_y.l,path_x_new_y.r,this.p_list[path_xy.end][path_a_new_y.end].front()],new Map([[pathSignature(path_x_new_y), "green"], [pathSignature(path_x_new_y.l), "green"], [pathSignature(path_x_new_y.r), "green"], [pathSignature(this.p_list[path_xy.end][path_a_new_y.end].front()), "green"]])
+            [path_x_new_y,path_x_new_y.l,path_x_new_y.r,this.p_list[path_xy.end][path_a_new_y.end].front(),path_xy],new Map([[pathSignature(path_x_new_y), "green"], [pathSignature(this.p_list[path_xy.end][path_a_new_y.end].front()), "blue"],[pathSignature(path_xy), "blue"]])
           );
+          assignPlaybackStepSquareLabel(
+          stepcounter,
+          "fixup-3",
+          "Najkratšie cesty",
+          "Lokálne najkratšie cesty",
+          "Nová Cesta",
+          "#999",
+          "#FF851B",
+          "green",
+          false,
+          false,
+          false,
+          false,"cesty s pridaným predĺžením"
+          );
+          stepcounter++;
           saveFixupStep(
             2,
             `pridávam cestu {${_parsepath(path_x_new_y, path_x_new_y.start + 1)}} do P(${path_x_new_y.start+1},${path_x_new_y.end+1}) a predĺženia cesty L({${_parsepath(path_a_new_y, path_a_new_y.start + 1)}}), R({${_parsepath(path_xy,path_xy.start + 1)}}) a H`,
@@ -1044,14 +1466,12 @@ clone() {
         shrinkpadding();
         shrinkpadding();
       }
-
+      pathColors.delete(pathSignature(path_xy));
       shrinkpadding();
     }
 
     shrinkpadding();
-    if (this.fixupSnapshots[2].length === 0) {
-      saveFixupStep(2, `fixup 3 nebolo potrebné meniť`, []);
-    }
+
   }
 
   update(v, w) {

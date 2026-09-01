@@ -3,7 +3,8 @@ import { initEditor, nextStep,addCodeLine,beforeStep,history,counter,goToLine,re
 import { formatWeight, parsePath, parseWeightValue, applyWeightUpdates } from "./utils.js";
 export let graph = null;
 export const labels = [];
-
+export const colorlabels = [];
+export const squareLabelSnapshots = [];
 export let cy;
 let ctr = 0;
 let node1;
@@ -229,15 +230,226 @@ function showInitialModePopup() {
     );
 }
 
+const squareData = [
+  { title: "", label: "Square A", color: "#ff6b6b" },
+  { title: "", label: "Square B", color: "#ffd166" },
+  { title: "", label: "Square C", color: "#7bd389" },
+  { title: "", label: "Cesta s predĺžením", color: "blue" }
+];
+
+const squarePhaseStates = {
+  "cleanup": [],
+  "fixup-1": [],
+  "fixup-2": [],
+  "fixup-3": []
+};
+
+function normalizeSquarePhase(phase = "cleanup") {
+  if (phase == null || phase === "") return "cleanup";
+
+  const value = String(phase).trim().toLowerCase();
+  if (value === "cleanup") return "cleanup";
+  if (value.startsWith("fixup")) {
+    const match = value.match(/fixup[-_ ]?(\d+)/);
+    if (match) return `fixup-${match[1]}`;
+  }
+
+  return null;
+}
+
+export function assignPlaybackStepSquareLabel(
+  stepValue,
+  phase,
+  LabelA,
+  labelB,
+  labelC,
+  colorA,
+  colorB,
+  colorC,
+  hiddenA = false,
+  hiddenB = false,
+  hiddenC = false,
+  hiddenD = true,
+  LabelD  = null
+) {
+  let index = Number(stepValue);
+  let resolvedPhase = normalizeSquarePhase(phase) ?? "cleanup";
+  let labelAValue = LabelA;
+  let labelBValue = labelB;
+  let labelCValue = labelC;
+
+  let colorAValue = colorA;
+  let colorBValue = colorB;
+  let colorCValue = colorC;
+
+  let hiddenAValue = hiddenA;
+  let hiddenBValue = hiddenB;
+  let hiddenCValue = hiddenC;
+  let hiddenDValue = hiddenD;
+  
+
+  if (!Number.isInteger(index) || index < 0) return squarePhaseStates;
+  if (!squarePhaseStates[resolvedPhase]) squarePhaseStates[resolvedPhase] = [];
+
+  const state = [
+    {
+      label: typeof labelAValue === "string" ? labelAValue : "",
+      color: typeof colorAValue === "string" ? colorAValue : "#999",
+      hidden: !!hiddenAValue
+    },
+    {
+      label: typeof labelBValue === "string" ? labelBValue : "",
+      color: typeof colorBValue === "string" ? colorBValue : "#999",
+      hidden: !!hiddenBValue
+    },
+    {
+      label: typeof labelCValue === "string" ? labelCValue : "",
+      color: typeof colorCValue === "string" ? colorCValue : "#999",
+      hidden: !!hiddenCValue
+    },
+    {
+      label: LabelD === null ?"Cesta s predĺžením":LabelD,
+      color:  "blue",
+      hidden: !!hiddenDValue
+    }
+  ];
+
+  squarePhaseStates[resolvedPhase][index] = state;
+  state.forEach((squareState, squareIndex) => {
+    changeSquareAppearance(squareIndex, squareState.label, squareState.color, squareState.hidden);
+  });
+  saveSquareLabelState(index, state, resolvedPhase);
+  return state;
+}
+
+export function changeSquareAppearance(index, label, color, hidden = false) {
+  const squareIndex = Number(index);
+  const square = squareData[squareIndex];
+  if (!square) return;
+
+  if (typeof label !== "undefined") {
+    square.label = String(label);
+  }
+
+  if (typeof color !== "undefined") {
+    square.color = String(color);
+  }
+
+  const row = document.querySelector(`[data-square-index="${squareIndex}"]`);
+  if (!row) return;
+
+  const preview = row.querySelector(".square-preview");
+  const labelNode = row.querySelector(".square-label");
+
+  if (preview) preview.style.backgroundColor = square.color;
+  if (labelNode) labelNode.textContent = square.label;
+
+  row.style.display = hidden ? "none" : "flex";
+}
+
+export function saveSquareLabelState(stepNumber, stateOverride = null, phase = null) {
+  const index = Number(stepNumber);
+  if (!Number.isInteger(index) || index < 0) return squareLabelSnapshots;
+
+  const snapshot = Array.isArray(stateOverride)
+    ? stateOverride.slice(0, squareData.length)
+    : squareData.map((square) => ({
+        label: square.label,
+        color: square.color,
+        hidden: document.querySelector(`[data-square-index="${squareData.indexOf(square)}"]`)?.style.display === "none"
+      }));
+
+  const resolvedPhase = normalizeSquarePhase(phase) ?? "cleanup";
+  if (squarePhaseStates[resolvedPhase]) {
+    squarePhaseStates[resolvedPhase][index] = snapshot;
+  }
+
+  squareLabelSnapshots[index] = snapshot;
+  return squareLabelSnapshots;
+}
+
+export function drawSquareLabelsFromPlayback(playbackLabels = [], stepNumber = 0, phase = "cleanup") {
+  if (!Array.isArray(playbackLabels)) return [];
+
+  const safeIndex = Number(stepNumber);
+  if (!Number.isInteger(safeIndex) || safeIndex < 0) return playbackLabels;
+
+  const resolvedPhase = normalizeSquarePhase(phase) ?? "cleanup";
+  const phaseState = Array.isArray(squarePhaseStates[resolvedPhase]?.[safeIndex])
+    ? squarePhaseStates[resolvedPhase][safeIndex]
+    : null;
+
+  if (phaseState) {
+    phaseState.forEach((squareState, idx) => {
+      changeSquareAppearance(idx, squareState.label, squareState.color, squareState.hidden);
+    });
+    saveSquareLabelState(safeIndex, phaseState, resolvedPhase);
+    return playbackLabels;
+  }
+
+  const labelsToApply = playbackLabels.slice(0, squareData.length);
+  labelsToApply.forEach((label, idx) => {
+    const currentColor = squareData[idx]?.color || "#999";
+    if (typeof label === "string" && label.trim()) {
+      changeSquareAppearance(idx, label, currentColor);
+    }
+  });
+
+  saveSquareLabelState(safeIndex, labelsToApply.map((label, idx) => ({
+    label: typeof label === "string" ? label : squareData[idx]?.label || "",
+    color: squareData[idx]?.color || "#999",
+    hidden: false
+  })), resolvedPhase);
+
+  return playbackLabels;
+}
+
+function initSquarePanel() {
+  const panel = document.getElementById("color-square-panel");
+  if (!panel) return;
+
+  panel.innerHTML = "";
+
+  squareData.forEach((square, index) => {
+    const row = document.createElement("div");
+    row.className = "square-item";
+    row.dataset.squareIndex = String(index);
+
+    const preview = document.createElement("div");
+    preview.className = "square-preview";
+    preview.style.backgroundColor = square.color;
+
+    const info = document.createElement("div");
+    info.className = "square-info";
+
+    const title = document.createElement("div");
+    title.className = "square-title";
+    title.textContent = square.title;
+
+    const label = document.createElement("div");
+    label.className = "square-label";
+    label.textContent = square.label;
+
+    info.appendChild(title);
+    info.appendChild(label);
+    row.appendChild(preview);
+    row.appendChild(info);
+    panel.appendChild(row);
+  });
+}
+
 window.addEventListener("DOMContentLoaded", () => {
   initEditor();
-
+  initSquarePanel();
 
   // 🔥 expose to HTML
   window.nextStep = nextStep;
   window.codeView =codeView;
   window.beforeStep = beforeStep;
   window.goToLine = goToLine;
+  window.changeSquareAppearance = changeSquareAppearance;
+  window.assignPlaybackStepSquareLabel = assignPlaybackStepSquareLabel;
+  window.modifyPlaybackStepLabel = modifyPlaybackStepLabel;
 });
 
 export function modifyPlaybackStepLabel(labels, stepNumber, newLabel) {
@@ -247,9 +459,18 @@ export function modifyPlaybackStepLabel(labels, stepNumber, newLabel) {
   if (!Number.isInteger(index) || index < 0) return labels;
 
   labels[index] = newLabel;
+  //drawSquareLabelsFromPlayback(labels, index);
   return labels;
 }
+export function modifyColorBoxLabel(labels, stepNumber, newLabel) {
+  if (!Array.isArray(labels)) return [];
 
+  const index = Number(stepNumber);
+  if (!Number.isInteger(index) || index < 0) return labels;
+
+  colorlabels.push([stepNumber, newLabel]);
+  return labels;
+}
 export function buildPlaybackStepLabel({ phase, index, isActive = false }) {
   const phaseKey = phase?.key ?? "cleanup";
   const phaseNumber = phaseKey.startsWith("fixup-") ? Number(phaseKey.split("-")[1]) : null;
@@ -261,6 +482,24 @@ export function buildPlaybackStepLabel({ phase, index, isActive = false }) {
   }
 
   return `${phaseName} – krok ${stepIndex}`;
+}
+
+function restoreMainGraphPerspective() {
+  if (updateCardsApp?.updates) {
+    updateCardsApp.updates.forEach(update => {
+      update.selected = null;
+    });
+  }
+
+  cyPerspective = "graph";
+  setPerspectiveControlsVisible(true);
+
+  const graphRadio = document.querySelector('input[name="cyPerspective"][value="graph"]');
+  if (graphRadio) graphRadio.checked = true;
+
+  if (graph) {
+    updateCytoscapeEdges(graph);
+  }
 }
 
 const updateCardsApp = Vue.createApp({
@@ -287,12 +526,32 @@ const updateCardsApp = Vue.createApp({
     },
     selectPhase(update, phase) {
       update.selected = phase.key;
+      setPerspectiveControlsVisible(false);
       if (phase.key === "cleanup") {
         updateCytoscapeEdgesCode(update.cleanupSnapshot, null, update.cleanupOriginal);
+        changeSquareAppearance(0, "Najkratšie cesty", "#999");
+        changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B");
+        changeSquareAppearance(2, "Odstránené cesty", "red");
       } else {
         const phaseIndex = Number(phase.key.slice(-1)) - 1;
         const phaseSnapshots = update.fixupSnapshots?.[phaseIndex] || [];
-        const snapshot = phaseSnapshots[phaseIndex === 2 ? phaseSnapshots.length - 1 : 0];
+        const snapshot = phaseSnapshots[phaseSnapshots.length - 1];
+        if (phase.key === "fixup-1") {
+          changeSquareAppearance(0, "pridané hrany", "green");
+          changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B", true);
+          changeSquareAppearance(2, "pridané hrany", "green", true);
+        }
+        else if (phase.key === "fixup-2") {
+          changeSquareAppearance(0, "pridané hrany", "green");
+          changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B", true);
+          changeSquareAppearance(2, "cesty pridané do radu H", "green", true);
+        }
+        else if (phase.key === "fixup-3") {
+      
+          changeSquareAppearance(0, "Najkratšie cesty", "#999");
+          changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B");
+          changeSquareAppearance(2, "Ostatné cesty", "green");
+        }
         if (!snapshot) return;
         updateCytoscapeEdgesCode(
           snapshot.graph,
@@ -309,7 +568,12 @@ const updateCardsApp = Vue.createApp({
       this.updates.forEach(update => {
         update.selected = null;
       });
+      setPerspectiveControlsVisible(true);
       updateCytoscapeEdges(graph);
+      changeSquareAppearance(0, "Najkratšie cesty", "#999", false);
+      changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B", false);
+      changeSquareAppearance(2, "Odstránené cesty", "red", true);
+      changeSquareAppearance(3, "Cesta s predĺžením", "blue", true);
       this.closePlayback();
     },
     startPlayback(update, phase) {
@@ -350,6 +614,8 @@ const updateCardsApp = Vue.createApp({
           goal = "Doplnenie lokálne najkratších a najkratších ciest";
           break;
       }
+      setPerspectiveControlsVisible(false);
+      drawSquareLabelsFromPlayback(labels, this.currentStep, phase.key);
       this.player = {
         update,
         phase,
@@ -373,6 +639,7 @@ const updateCardsApp = Vue.createApp({
         this.currentStep++;
         this.updateWorkspaceStepList();
         renderSavedGraphState(this.player.saved[this.currentStep]);
+        drawSquareLabelsFromPlayback(labels, this.currentStep, this.player.phase.key);
       }
     },
     previousStep() {
@@ -380,6 +647,7 @@ const updateCardsApp = Vue.createApp({
         this.currentStep--;
         this.updateWorkspaceStepList();
         renderSavedGraphState(this.player.saved[this.currentStep]);
+        drawSquareLabelsFromPlayback(labels, this.currentStep, this.player.phase.key);
       }
     },
     updateWorkspaceStepList() {
@@ -389,6 +657,7 @@ const updateCardsApp = Vue.createApp({
     closePlayback() {
       this.player = null;
       this.currentStep = 0;
+      setPerspectiveControlsVisible(true);
       document.getElementById("playback-workspace")?.classList.add("is-hidden");
       const targetElement = document.getElementById("playback-target");
       const stepsElement = document.getElementById("playback-steps");
@@ -439,6 +708,21 @@ const updateCardsApp = Vue.createApp({
     </div>
   `
 }).mount("#update-app");
+
+document.addEventListener("click", (event) => {
+  const clickedInsideUpdateApp = event.target.closest("#update-app");
+  const clickedInsidePlayback = event.target.closest("#playback-workspace");
+  const clickedInsidePerspective = event.target.closest("#cy-perspective-controls");
+
+  if (clickedInsideUpdateApp || clickedInsidePlayback || clickedInsidePerspective) {
+    return;
+  }
+
+  const hasStaticPreview = updateCardsApp?.updates?.some(update => update.selected);
+  if (hasStaticPreview) {
+    restoreMainGraphPerspective();
+  }
+});
 
 function getLoopGeometry(source, target, index, total) {
   if (source !== target) return {};
@@ -567,6 +851,7 @@ function resetShortestQueues(){
 
 }
 function resetLocallyShortestQueues(){
+  document.getElementById("panel").style.display = "none";
   document.getElementById("panel").innerHTML = "";
   createRadioButtons();
   for (let i = 0; i < graph.V; i++){
@@ -629,7 +914,6 @@ async function showName() {
       alert(" Existuje viacero najkratších ciest medzi vrcholmi " + error.cause[0] + " a " + error.cause[1] + ". Algoritmus vyžaduje jedinečnú najkratšiu cestu medzi každou dvojicou vrcholov.");
       throw error;
   }
-
 
 
   //resetShortestQueues();
@@ -775,11 +1059,45 @@ cy.on('mouseover', 'edge', (evt) => {
       <strong>Vrcholy</strong> ${parsePath(pathData, (pathData.start+1).toString())}<br>
       <strong>Weight:</strong> ${pathData.weight === Infinity ? '∞' : pathData.weight}<br>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 6px 0;">
-      <strong>Left (l):</strong> ${formatNeighborPath(pathData.l)}<br>
-      <strong>Right (r):</strong> ${formatNeighborPath(pathData.r)}<br>
+      <strong>Skrátenie cesty o posledný vrchol (l):</strong> ${pathData.l === null ? 'neexistuje' : parsePath(pathData.l, (pathData.l.start+1).toString())}<br>
+      <strong>Skrátenie cesty o prvý vrchol (r):</strong> ${pathData.r === null ? 'neexistuje' : parsePath(pathData.r, (pathData.r.start+1).toString())}<br>
       <hr style="border: 0; border-top: 1px solid #ddd; margin: 6px 0;">
-      <strong>Sizes (L/R):</strong> ${pathData.L?.length || 0} / ${pathData.R?.length || 0}<br>
-      <strong>Shortest (L*/R*):</strong> ${pathData.L_star?.length || 0} / ${pathData.R_star?.length || 0}
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 6px 0;">
+
+      <strong>Všetky cesty v L:</strong><br>
+      ${pathData.L?.length
+        ? pathData.L
+            .map(path => `{${parsePath(path, (path.start + 1).toString())}}`)
+            .join(', ')
+        : 'žiadne'
+      }
+      <br><br>
+
+      <strong>Všetky cesty v R:</strong><br>
+      ${pathData.R?.length
+        ? pathData.R
+            .map(path => `{${parsePath(path, (path.start + 1).toString())}}`)
+            .join(', ')
+        : 'žiadne'
+      }
+    <hr style="border: 0; border-top: 1px solid #ddd; margin: 6px 0;">
+      <strong>Všetky cesty v L*:</strong><br>
+      ${pathData.L_star?.length
+        ? pathData.L_star
+            .map(path => `{${parsePath(path, (path.start + 1).toString())}}`)
+            .join(', ')
+        : 'žiadne'
+      }
+      <br><br>
+
+      <strong>Všetky cesty v R*:</strong><br>
+      ${pathData.R_star?.length
+        ? pathData.R_star
+            .map(path => `{${parsePath(path, (path.start + 1).toString())}}`)
+            .join(', ')
+        : 'žiadne'
+      };
+
     `;
     
     tooltip.style.display = 'block'; // Zobrazíme box
@@ -800,6 +1118,17 @@ cy.on('mouseout', 'edge', (evt) => {
   evt.target.removeStyle(); // Vrátime pôvodnú hrúbku hrany
   tooltip.style.display = 'none'; // Skryjeme box
 });
+console.log(
+  "square panel:",
+  document.getElementById("color-square-panel")
+);
+
+console.log(
+  "square rows:",
+  document.querySelectorAll("[data-square-index]")
+);
+  changeSquareAppearance(0, "Najkratšie cesty", "#999", false);
+  changeSquareAppearance(1, "Lokálne najkratšie cesty", "#FF851B",false);
 }
 
 function getdistance(x, y) {
@@ -823,6 +1152,7 @@ function getdistance(x, y) {
   alert(
     `Vzdialenosť medzi vrcholmi ${x + 1} a ${y + 1} je ${result == Infinity ? "nekonečno" : result}.`,
   );
+
 }
 
 function getpath(x, y) {
@@ -1160,6 +1490,7 @@ export function updateCytoscapeEdgesCode(
   additionalPaths = [],
   pathColors = new Map()
 ) {
+  console.log("Updating Cytoscape edges with provided graph and parameters...");
   if (!cy || !graph) return;
 
   cy.edges().remove();
@@ -1225,7 +1556,7 @@ export function updateCytoscapeEdgesCode(
         const key = `${u-1}-${v-1}`;
         const explicitColor = getPathColor(path);
         let color = explicitColor || getPathEdgeColor(graph, path);
-        if (!explicitColor && (highlightMode === "fixup-2" || highlightMode === "fixup-3")) {
+        if (!explicitColor && highlightMode === "fixup-2") {
           color = "#16803c";
         } else if (!explicitColor && highlightMode === "fixup-1" && !baselinePaths.has(pathSignature(path))) {
           color = "#16803c";
@@ -1349,6 +1680,12 @@ window.addEventListener("resize", () => {
 let currentMode = null;
 let cyPerspective = "graph";
 
+function setPerspectiveControlsVisible(isVisible) {
+  const perspectiveControls = document.getElementById("cy-perspective-controls");
+  if (!perspectiveControls) return;
+  perspectiveControls.style.display = isVisible ? "inline-flex" : "none";
+}
+
 window.addEventListener("DOMContentLoaded", () => {
 
   document.querySelectorAll('input[name="cyPerspective"]').forEach(radio => {
@@ -1357,6 +1694,8 @@ window.addEventListener("DOMContentLoaded", () => {
       requestAnimationFrame(() => updateCytoscapeEdges(graph));
     });
   });
+
+  setPerspectiveControlsVisible(true);
 
   const vectorDiv = document.getElementById("vectorInputs");
   const edgeDiv = document.getElementById("edgeInputs");

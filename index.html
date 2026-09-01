@@ -38,7 +38,7 @@
         <span id="cy-perspective-controls">
         <label>
         <input type="radio" name="cyPerspective" value="graph" checked>
-        Graf
+        Cesty
         </label>
         <label>
         <input type="radio" name="cyPerspective" value="edge">
@@ -126,12 +126,13 @@
         </div>
     </div>
     <script type="module" src="./main.js"></script>
-    <div class="side-panel" id="panel">
+    <div class="side-panel" id="panel" style="display: none;">
         <label><input type="radio" name="mode1" value="L"> Najkratšie cesty</label>
         <label><input type="radio" name="mode1" value="NonL"> Lokálne najkratšie cesty</label>
     </div>
+    <div id="color-square-panel" class="color-square-panel" aria-label="Farby"></div>
     <aside class="side-panel update-side-panel"  aria-label="Aktualizácie">
-        <h2 class="workspace-label">Kroky</h2>
+        <h2 class="workspace-label">funkcie</h2>
         <div id="update-app"></div>
     </aside>
 </body>
