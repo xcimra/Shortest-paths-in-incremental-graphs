@@ -191,6 +191,11 @@ export function beforeStep() {
  * Optional: reset editor state
  */
 export function resetEditor() {
+  codeLines.length = 0;
+  counthistory.length = 0;
+  history.length = 0;
+  padding = 0;
+  counter = 0;
   currentLine = 0;
   render();
 }

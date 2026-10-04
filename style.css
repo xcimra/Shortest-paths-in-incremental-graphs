@@ -309,3 +309,129 @@ body {
   font-size: 14px;
   transition: top 0.2s ease, left 0.2s ease;
 }
+
+.vertex-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid #d5ded8;
+  border-radius: 10px;
+  background: #fff;
+  color: #1d3029;
+  box-shadow: 0 24px 70px rgba(14, 35, 27, 0.24);
+}
+.vertex-dialog::backdrop {
+  background: rgba(15, 28, 23, 0.48);
+  backdrop-filter: blur(3px);
+}
+.vertex-dialog [hidden] {
+  display: none !important;
+}
+.vertex-form {
+  padding: 24px;
+}
+.vertex-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.vertex-dialog-kicker {
+  margin: 0 0 6px;
+  color: #56806b;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.vertex-dialog-heading h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 650;
+}
+.vertex-dialog-close {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 1px solid #e0e7e2;
+  border-radius: 6px;
+  background: #f7f9f7;
+  color: #42564a;
+  cursor: pointer;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+.vertex-dialog-fields {
+  display: grid;
+  gap: 8px;
+}
+.vertex-dialog-fields label {
+  margin-top: 4px;
+  color: #30483a;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.vertex-dialog-fields input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  border: 1px solid #cbd6ce;
+  border-radius: 6px;
+  background: #fbfcfb;
+  color: #1d3029;
+  font: inherit;
+  font-size: 1rem;
+}
+.vertex-dialog-fields input:focus {
+  border-color: #23734a;
+  outline: 3px solid rgba(35, 115, 74, 0.16);
+}
+.vertex-dialog-fields input[aria-invalid="true"] {
+  border-color: #b42318;
+}
+.vertex-error {
+  margin: 4px 0 0;
+  color: #a32118;
+  font-size: 0.86rem;
+}
+.vertex-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+.vertex-button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.vertex-button-secondary {
+  border-color: #d5ded8;
+  background: #fff;
+  color: #34483b;
+}
+.vertex-button-primary {
+  background: #1c6843;
+  color: #fff;
+}
+.vertex-button-primary:hover {
+  background: #155536;
+}
+@media (max-width: 480px) {
+  .vertex-form {
+    padding: 20px;
+  }
+  .vertex-dialog-actions {
+    flex-direction: column-reverse;
+  }
+  .vertex-button {
+    width: 100%;
+  }
+}

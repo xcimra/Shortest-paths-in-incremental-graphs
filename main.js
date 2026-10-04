@@ -1,5 +1,5 @@
 import { Graph } from "./graph.js";
-import { initEditor, nextStep,addCodeLine,beforeStep,history,counter,goToLine,resetcurrentline} from "./editor.js";
+import { initEditor, nextStep,addCodeLine,beforeStep,history,counter,goToLine,resetcurrentline,resetEditor } from "./editor.js";
 import { formatWeight, parsePath, parseWeightValue, applyWeightUpdates } from "./utils.js";
 export let graph = null;
 export const labels = [];
@@ -538,6 +538,10 @@ export function buildPlaybackStepLabel({ phase, index, isActive = false }) {
     return `${phaseName} – aktuálny stav`;
   }
 
+  if (phaseKey === "cleanup") {
+    return "cleanup – stav";
+  }
+
   return `${phaseName} – krok ${stepIndex}`;
 }
 
@@ -575,6 +579,7 @@ const updateCardsApp = Vue.createApp({
         vertex: vertex + 1,
         cleanupSnapshot: graph.cleanupSnapshot,
         cleanupOriginal: graph.cleanupOriginal,
+        cleanupLabels: labels.slice(),
         fixupSnapshots: graph.fixupSnapshots,
         savedStates: graph.savedStates,
         selected: null,
@@ -632,8 +637,8 @@ const updateCardsApp = Vue.createApp({
           null,
           phase.key,
           baselineGraph,
-          snapshot.paths,
-          snapshot.colors
+          phase.key === "fixup-3" ? [] : snapshot.paths,
+          phase.key === "fixup-3" ? new Map() : snapshot.colors
         );
       }
     },
@@ -658,7 +663,7 @@ const updateCardsApp = Vue.createApp({
         : (update.fixupSnapshots?.[phaseIndex] || []);
       if (!saved.length) return;
       const phaseLabels = phase.key === "cleanup"
-        ? labels
+        ? (update.cleanupLabels || [])
         : (labels.fixup?.[phaseIndex] || []);
       const initialState = saved[0];
       const steps = saved.map((state, index) =>
@@ -964,29 +969,53 @@ const tooltip = document.getElementById('path-tooltip');
 
 async function showName() {
   console.log("showName called");
-  if (numVertices != null)
-  {
-    alert("ak chcete vytvoriť nový graf obnovte stránku");
-    return;
-  }
+  const previousNumVertices = numVertices;
+  const previousEdgeMatrix = edge_matrix;
+  numVertices = null;
+  edge_matrix = null;
 
   const shouldContinue = await showInitialModePopup();
   if (!shouldContinue) {
+    numVertices = previousNumVertices;
+    edge_matrix = previousEdgeMatrix;
     return;
   }
 
   const elements = [];
   console.log("Creating graph with", numVertices, "vertices and edge matrix:", edge_matrix);
+  let nextGraph;
   try{
-      graph = new Graph(numVertices,edge_matrix,addCodeLine);
+      nextGraph = new Graph(numVertices,edge_matrix,addCodeLine);
   } catch (error) {
-    numVertices = null;
+    numVertices = previousNumVertices;
+    edge_matrix = previousEdgeMatrix;
     if (!error.cause ) {
         throw error;
     }
       alert(" Existuje viacero najkratších ciest medzi vrcholmi " + error.cause[0] + " a " + error.cause[1] + ". Algoritmus vyžaduje jedinečnú najkratšiu cestu medzi každou dvojicou vrcholov.");
-      throw error;
+      return;
   }
+
+  graph = nextGraph;
+  resetEditor();
+  updateCardsApp.closePlayback();
+  updateCardsApp.updates.splice(0);
+  labels.length = 0;
+  labels.fixup?.forEach(phaseLabels => phaseLabels.splice(0));
+  colorlabels.length = 0;
+  squareLabelSnapshots.length = 0;
+  Object.values(squarePhaseStates).forEach(phaseStates => phaseStates.splice(0));
+  codeview = false;
+  const codeModeButton = document.getElementById("codemode");
+  if (codeModeButton) codeModeButton.textContent = "mód pozerania kódu";
+  const startInput = document.getElementById("start");
+  const endInput = document.getElementById("end");
+  if (startInput) startInput.value = "";
+  if (endInput) endInput.value = "";
+  cyPerspective = "graph";
+  setPerspectiveControlsVisible(true);
+  const graphRadio = document.querySelector('input[name="cyPerspective"][value="graph"]');
+  if (graphRadio) graphRadio.checked = true;
 
 
   //resetShortestQueues();
@@ -1036,6 +1065,10 @@ async function showName() {
   }
   const nodeSize = Math.max(20, 120 / Math.sqrt(numVertices));
   const fontSize = Math.max(10, nodeSize / 2);
+  if (cy) {
+    cy.destroy();
+    cy = null;
+  }
   cy = cytoscape({
     container: document.getElementById("cy"),
     elements: elements,
@@ -1220,12 +1253,44 @@ function getdistance(x, y) {
   }
 
   
-  let result = graph.distance(x, y);
+  const result = graph.distance(x, y);
+  showVertexResult(`Vzdialenosť medzi vrcholmi ${x + 1} a ${y + 1} je ${result === Infinity ? "nekonečno" : result}.`);
 
-  alert(
-    `Vzdialenosť medzi vrcholmi ${x + 1} a ${y + 1} je ${result == Infinity ? "nekonečno" : result}.`,
-  );
+}
 
+function showVertexResult(message) {
+  document.querySelector(".vertex-dialog-kicker").hidden = true;
+  document.querySelector(".vertex-dialog-fields").hidden = true;
+  document.querySelector(".vertex-dialog-actions").hidden = true;
+  document.getElementById("vertex-dialog-title").textContent = message;
+}
+
+let pendingVertexCallback = null;
+
+function askForVertices(callback) {
+  if (graph === null) {
+    alert("zadajte najprv počet vrcholov");
+    return;
+  }
+
+  const dialog = document.getElementById("vertex-dialog");
+  const startInput = document.getElementById("vertex-start");
+  const endInput = document.getElementById("vertex-end");
+  const dialogTitle = document.getElementById("vertex-dialog-title");
+  const submitButton = document.getElementById("vertex-dialog-submit");
+
+  pendingVertexCallback = callback;
+  startInput.value = "";
+  endInput.value = "";
+  startInput.max = graph.V;
+  endInput.max = graph.V;
+  document.querySelector(".vertex-dialog-kicker").hidden = false;
+  document.querySelector(".vertex-dialog-fields").hidden = false;
+  document.querySelector(".vertex-dialog-actions").hidden = false;
+  dialogTitle.textContent = callback === getdistance ? "Vzdialenosť" : "Cesta";
+  submitButton.textContent = callback === getdistance ? "Zobraziť vzdialenosť" : "Zobraziť cestu";
+  dialog.showModal();
+  startInput.focus();
 }
 
 function getpath(x, y) {
@@ -1246,15 +1311,12 @@ function getpath(x, y) {
   let result = graph.path(x, y);
 
   if (result == null) {
-    alert("Cesta neexistuje.");
+    showVertexResult(`Cesta medzi vrcholmi ${x + 1} a ${y + 1} neexistuje.`);
     return;
   }
 
-  let pathstring = `Cesta obsahuje vrcholy: ${result.start + 1}`;
-
-  pathstring = parsePath(result, pathstring);
-
-  alert(pathstring + ".");
+  const pathstring = parsePath(result, String(result.start + 1)).replace(/,/g, ", ");
+  showVertexResult(`Cesta medzi vrcholmi ${x + 1} a ${y + 1} vedie cez vrcholy ${pathstring}.`);
 }
 
 function addUpdateCards(vertex) {
@@ -1331,6 +1393,7 @@ for (let i = 0; i < numVertices; i++) {
   catch (e)
   {
     alert("zly vstup");
+    return;
   }
   w = [resultIn,resultOut];
   if (resultOut[v_start] == Infinity){
@@ -1368,6 +1431,7 @@ w = [inArr, outArr];
     throw error;
   }
 
+  restoreMainGraphPerspective();
   resetShortestQueues();
   addUpdateCards(v_start);
   updateCytoscapeEdges(graph);
@@ -1741,7 +1805,49 @@ export function updateCytoscapeEdgesCode(
 window.showName = showName;
 window.getdistance = getdistance;
 window.getpath = getpath;
+window.askForVertices = askForVertices;
 window.doupdate = doupdate;
+const vertexDialog = document.getElementById("vertex-dialog");
+const vertexForm = document.getElementById("vertex-form");
+vertexForm.addEventListener("submit", event => {
+  event.preventDefault();
+  const startInput = document.getElementById("vertex-start");
+  const endInput = document.getElementById("vertex-end");
+  const errorMessage = document.getElementById("vertex-error");
+  const inputs = [startInput, endInput];
+  const invalidInputs = inputs.filter(input => {
+    const value = Number(input.value);
+    return !input.value || !Number.isInteger(value) || value < 1 || value > graph.V;
+  });
+
+  inputs.forEach(input => input.removeAttribute("aria-invalid"));
+  if (invalidInputs.length > 0) {
+    invalidInputs.forEach(input => input.setAttribute("aria-invalid", "true"));
+    errorMessage.textContent = `Zadajte celé číslo od 1 do ${graph.V} pre ${invalidInputs.length === 2 ? "oba vrcholy" : invalidInputs[0] === startInput ? "začiatočný vrchol" : "koncový vrchol"}.`;
+    errorMessage.hidden = false;
+    invalidInputs[0].focus();
+    return;
+  }
+
+  errorMessage.hidden = true;
+  const callback = pendingVertexCallback;
+  const start = startInput.value;
+  const end = endInput.value;
+  pendingVertexCallback = null;
+  if (callback) callback(start, end);
+});
+vertexForm.addEventListener("input", () => {
+  document.getElementById("vertex-error").hidden = true;
+  document.querySelectorAll("#vertex-start, #vertex-end").forEach(input => input.removeAttribute("aria-invalid"));
+});
+document.getElementById("vertex-dialog-close").addEventListener("click", () => vertexDialog.close());
+document.getElementById("vertex-dialog-cancel").addEventListener("click", () => vertexDialog.close());
+vertexDialog.addEventListener("close", () => {
+  pendingVertexCallback = null;
+});
+vertexDialog.addEventListener("click", event => {
+  if (event.target === vertexDialog) vertexDialog.close();
+});
 window.addEventListener("resize", () => {
   if (cy) {
     cy.resize();

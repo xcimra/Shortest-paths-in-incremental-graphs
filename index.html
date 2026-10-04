@@ -70,21 +70,32 @@
         <div style="margin-left: 8vh;">
         <button onclick="showName()">Nový graf</button>
 
-        <input type="number" id="start" placeholder="Začiatok">
-        <input type="number" id="end" placeholder="Koniec">
+        <button onclick="askForVertices(getdistance)">Vzdialenosť</button>
 
-
-
-        <button onclick="getdistance(
-            document.getElementById('start').value,
-            document.getElementById('end').value
-        )">Vzdialenosť</button>
-
-        <button onclick="getpath(
-            document.getElementById('start').value,
-            document.getElementById('end').value
-        )">Cesta</button>
+        <button onclick="askForVertices(getpath)">Cesta</button>
         </div>
+        <dialog id="vertex-dialog" class="vertex-dialog" aria-labelledby="vertex-dialog-title">
+            <form id="vertex-form" class="vertex-form" novalidate>
+                <div class="vertex-dialog-heading">
+                    <div>
+                        <p class="vertex-dialog-kicker">DOTAZ NA GRAF</p>
+                        <h2 id="vertex-dialog-title">Vzdialenosť</h2>
+                    </div>
+                    <button type="button" id="vertex-dialog-close" class="vertex-dialog-close" aria-label="Zavrieť">&times;</button>
+                </div>
+                <div class="vertex-dialog-fields">
+                    <label for="vertex-start">Začiatočný vrchol</label>
+                    <input id="vertex-start" name="start" type="number" min="1" step="1" placeholder="Číslo vrcholu" required aria-describedby="vertex-error">
+                    <label for="vertex-end">Koncový vrchol</label>
+                    <input id="vertex-end" name="end" type="number" min="1" step="1" placeholder="Číslo vrcholu" required aria-describedby="vertex-error">
+                    <p id="vertex-error" class="vertex-error" role="alert" hidden></p>
+                </div>
+                <div class="vertex-dialog-actions">
+                    <button type="button" id="vertex-dialog-cancel" class="vertex-button vertex-button-secondary">Zrušiť</button>
+                    <button type="submit" id="vertex-dialog-submit" class="vertex-button vertex-button-primary">Vypočítať</button>
+                </div>
+            </form>
+        </dialog>
         <div id = "vectorInputs" style="margin-left: 8vh;">
         <input type="text" id="v" placeholder="vrchol">
         <input type="text" id="win" style="width:185px" placeholder="hrany vychadzajuce z vrcholu">
