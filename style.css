@@ -424,6 +424,21 @@ body {
 .vertex-button-primary:hover {
   background: #155536;
 }
+.graph-edge-hint {
+  width: 100%;
+  margin: 8px 0;
+  color: #42564a;
+  font-size: 0.9rem;
+  text-align: center;
+}
+.graph-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 60vh;
+  margin-left: 10vh;
+}
 @media (max-width: 480px) {
   .vertex-form {
     padding: 20px;

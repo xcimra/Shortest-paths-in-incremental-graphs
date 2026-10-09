@@ -1323,28 +1323,65 @@ function addUpdateCards(vertex) {
   updateCardsApp.addUpdate(vertex);
 }
 
+let pendingUpdateMode = null;
+
+function openUpdateDialog() {
+  if (graph === null) {
+    alert("zadajte najprv počet vrcholov");
+    return;
+  }
+
+  pendingUpdateMode = null;
+  currentMode = null;
+  ["update-vertex", "update-outgoing", "update-incoming", "update-targets", "update-sources"].forEach(id => {
+    const input = document.getElementById(id);
+    input.value = "";
+    input.removeAttribute("aria-invalid");
+  });
+  document.getElementById("update-mode-fields").hidden = false;
+  document.getElementById("update-entry-fields").hidden = true;
+  document.getElementById("update-dialog-actions").hidden = true;
+  document.getElementById("update-dialog-title").textContent = "Aktualizácia vrcholu";
+  document.getElementById("update-error").hidden = true;
+  document.getElementById("update-dialog").showModal();
+}
+
+function selectUpdateMode(mode) {
+  pendingUpdateMode = mode;
+  currentMode = mode;
+  document.getElementById("update-error").hidden = true;
+  document.getElementById("update-mode-fields").hidden = true;
+  document.getElementById("update-entry-fields").hidden = false;
+  document.getElementById("update-dialog-actions").hidden = false;
+  document.getElementById("update-all-inputs").hidden = mode !== "vektor";
+  document.getElementById("update-some-inputs").hidden = mode !== "hrana";
+  document.getElementById("update-dialog-title").textContent =
+    mode === "vektor" ? "Zadať všetky hrany" : "Zadať iba niektoré hrany";
+  document.getElementById("update-vertex").max = graph.V;
+  document.getElementById("update-vertex").focus();
+}
+
 function doupdate(v, win, wout) {
   if (codeview)
   {
     alert("pozeranie kodu zapnute");
-    return;
+    return false;
   }
   if (!checkinput(v))
   {
-    return;
+    return false;
   }
   if (v-1 >=graph.V){
     alert("zle zadany vrchol");
-    return;
+    return false;
   }
-  const selected = document.querySelector('input[name="inputType"]:checked');
 
 
   const v_start = parseInt(v) - 1;
   if (isNaN(v_start))
   {
     alert("zadajte spravne meno vrcholu");
-    return;
+    return false;
   }
   let w;
   if (currentMode == "hrana"){
@@ -1393,7 +1430,7 @@ for (let i = 0; i < numVertices; i++) {
   catch (e)
   {
     alert("zly vstup");
-    return;
+    return false;
   }
   w = [resultIn,resultOut];
   if (resultOut[v_start] == Infinity){
@@ -1414,7 +1451,7 @@ const parseArray = (str) => {
 const inArr = parseArray(win);
 const outArr = parseArray(wout);
 
-if (!inArr || !outArr) return;
+if (!inArr || !outArr) return false;
 
 w = [inArr, outArr];
   }
@@ -1426,7 +1463,7 @@ w = [inArr, outArr];
         "Update vytvára viacero najkratších ciest medzi vrcholmi " +
         `${error.cause[0]} a ${error.cause[1]}. Update bol zamietnutý.`
       );
-      return;
+      return false;
     }
     throw error;
   }
@@ -1435,6 +1472,7 @@ w = [inArr, outArr];
   resetShortestQueues();
   addUpdateCards(v_start);
   updateCytoscapeEdges(graph);
+  return true;
 }
 
 function isPathInQueue(path, queue) {
@@ -1807,6 +1845,55 @@ window.getdistance = getdistance;
 window.getpath = getpath;
 window.askForVertices = askForVertices;
 window.doupdate = doupdate;
+window.openUpdateDialog = openUpdateDialog;
+const updateDialog = document.getElementById("update-dialog");
+const updateForm = document.getElementById("update-form");
+document.getElementById("update-all-edges").addEventListener("click", () => selectUpdateMode("vektor"));
+document.getElementById("update-some-edges").addEventListener("click", () => selectUpdateMode("hrana"));
+document.getElementById("update-dialog-back").addEventListener("click", () => {
+  pendingUpdateMode = null;
+  currentMode = null;
+  document.getElementById("update-mode-fields").hidden = false;
+  document.getElementById("update-entry-fields").hidden = true;
+  document.getElementById("update-dialog-actions").hidden = true;
+  document.getElementById("update-dialog-title").textContent = "Aktualizácia vrcholu";
+});
+updateForm.addEventListener("submit", event => {
+  event.preventDefault();
+  const vertexInput = document.getElementById("update-vertex");
+  const errorMessage = document.getElementById("update-error");
+  const vertex = Number(vertexInput.value);
+
+  vertexInput.removeAttribute("aria-invalid");
+  if (!Number.isInteger(vertex) || vertex < 1 || vertex > graph.V) {
+    vertexInput.setAttribute("aria-invalid", "true");
+    errorMessage.textContent = `Zadajte celé číslo vrcholu od 1 do ${graph.V}.`;
+    errorMessage.hidden = false;
+    vertexInput.focus();
+    return;
+  }
+
+  const firstValue = document.getElementById(
+    pendingUpdateMode === "vektor" ? "update-outgoing" : "update-targets"
+  ).value;
+  const secondValue = document.getElementById(
+    pendingUpdateMode === "vektor" ? "update-incoming" : "update-sources"
+  ).value;
+
+  if (doupdate(vertexInput.value, firstValue, secondValue)) {
+    updateDialog.close();
+  }
+});
+updateForm.addEventListener("input", () => {
+  document.getElementById("update-error").hidden = true;
+  document.getElementById("update-vertex").removeAttribute("aria-invalid");
+});
+document.getElementById("update-dialog-close").addEventListener("click", () => updateDialog.close());
+document.getElementById("update-dialog-cancel").addEventListener("click", () => updateDialog.close());
+updateDialog.addEventListener("close", () => {
+  pendingUpdateMode = null;
+  currentMode = null;
+});
 const vertexDialog = document.getElementById("vertex-dialog");
 const vertexForm = document.getElementById("vertex-form");
 vertexForm.addEventListener("submit", event => {
@@ -1874,28 +1961,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   setPerspectiveControlsVisible(true);
 
-  const vectorDiv = document.getElementById("vectorInputs");
-  const edgeDiv = document.getElementById("edgeInputs");
-  document.querySelectorAll('input[name="inputType"]').forEach(radio => {
-    radio.addEventListener("change", function () {
-      if (graph == null)
-      {
-        alert("zadajte najprv počet vrcholov");
-        return;
-      }
-      currentMode = this.value;
-      if (currentMode === "hrana") 
-      {
-        vectorDiv.style.display = "none";
-        edgeDiv.style.display = "block";
-      }
-      else{
-        edgeDiv.style.display = "none";
-        vectorDiv.style.display = "block";
-      }
-      //alert(currentMode);
-    });
-  });
 });
 window.addEventListener("DOMContentLoaded", () => {
 

@@ -67,12 +67,14 @@
         </div>
 
         <div id="cy" style="width: 60vh; height: 40vh; margin-left: 10vh;margin-right: 20vh; border: 1vh solid #ccc;"></div>
-        <div style="margin-left: 8vh;">
+        <div class="graph-actions">
         <button onclick="showName()">Nový graf</button>
 
         <button onclick="askForVertices(getdistance)">Vzdialenosť</button>
 
         <button onclick="askForVertices(getpath)">Cesta</button>
+        <button type="button" onclick="openUpdateDialog()">Update</button>
+        <p class="graph-edge-hint">Alebo zadajte hranu kliknutím na dva vrcholy v grafe (najprv zdrojový, potom cieľový).</p>
         </div>
         <dialog id="vertex-dialog" class="vertex-dialog" aria-labelledby="vertex-dialog-title">
             <form id="vertex-form" class="vertex-form" novalidate>
@@ -96,45 +98,44 @@
                 </div>
             </form>
         </dialog>
-        <div id = "vectorInputs" style="margin-left: 8vh;">
-        <input type="text" id="v" placeholder="vrchol">
-        <input type="text" id="win" style="width:185px" placeholder="hrany vychadzajuce z vrcholu">
-        <input type="text" id="wout" style="width:185px" placeholder="hrany vchadzajuce do vrcholu">
-
-        <button onclick="doupdate(
-            document.getElementById('v').value,
-            document.getElementById('win').value,
-            document.getElementById('wout').value
-        )">aktualizacia vrcholu</button>
-
-
-
-        </div>
-
-        <div id = "edgeInputs" style="display: none; margin-left: 2vh;">
-        <input type="text" id="v_edge" placeholder="aktualizovaný vrchol">
-        <input type="text" id="win_edge" placeholder="cielove vrcholy vo formate v1:h1,v2:h2" style="width: 40ch;">
-        <input type="text" id="wout_edge" placeholder="zdrojové vrcholy vo formate v1:h1,v2:h2" style="width: 40ch;">
-        <button onclick="doupdate(
-            document.getElementById('v_edge').value,
-            document.getElementById('win_edge').value,
-            document.getElementById('wout_edge').value
-        )">aktualizacia vrcholu</button>
-
-
-        <h1 style="font-size:16px;font-weight:normal;margin:0;">
-
-        </h1>
-        </div>
-        <div style="margin-left: 30vh;">
-        <label>
-        <input type="radio" name="inputType" value="hrana"> Hrana
-        </label>
-
-        <label>
-        <input type="radio" name="inputType" value="vektor" checked > Vektor
-        </label>
-        </div>
+        <dialog id="update-dialog" class="vertex-dialog" aria-labelledby="update-dialog-title">
+            <form id="update-form" class="vertex-form" novalidate>
+                <div class="vertex-dialog-heading">
+                    <div>
+                        <p class="vertex-dialog-kicker">AKTUALIZÁCIA GRAFU</p>
+                        <h2 id="update-dialog-title">Aktualizácia vrcholu</h2>
+                    </div>
+                    <button type="button" id="update-dialog-close" class="vertex-dialog-close" aria-label="Zavrieť">&times;</button>
+                </div>
+                <div id="update-mode-fields" class="vertex-dialog-fields">
+                    <p>Vyberte, ktoré hrany chcete zadať:</p>
+                    <button type="button" id="update-all-edges" class="vertex-button vertex-button-primary">Zadať všetky hrany</button>
+                    <button type="button" id="update-some-edges" class="vertex-button vertex-button-primary">Zadať iba niektoré hrany</button>
+                </div>
+                <div id="update-entry-fields" class="vertex-dialog-fields" hidden>
+                    <label for="update-vertex">Aktualizovaný vrchol</label>
+                    <input id="update-vertex" type="number" min="1" step="1" placeholder="Číslo vrcholu" required>
+                    <div id="update-all-inputs" class="vertex-dialog-fields" hidden>
+                        <label for="update-outgoing">Hrany vychádzajúce z vrcholu</label>
+                        <input id="update-outgoing" type="text" placeholder="Váhy hrán do vrcholov v poradí">
+                        <label for="update-incoming">Hrany vchádzajúce do vrcholu</label>
+                        <input id="update-incoming" type="text" placeholder="Váhy hrán zo vrcholov v poradí">
+                    </div>
+                    <div id="update-some-inputs" class="vertex-dialog-fields" hidden>
+                        <label for="update-targets">Cieľové vrcholy vo formáte vrchol1:váha1,vrchol2:váha2</label>
+                        <input id="update-targets" type="text" placeholder="vrchol1:váha1,vrchol2:váha2">
+                        <label for="update-sources">Zdrojové vrcholy vo formáte vrchol1:váha1,vrchol2:váha2</label>
+                        <input id="update-sources" type="text" placeholder="vrchol1:váha1,vrchol2:váha2">
+                    </div>
+                    <p id="update-error" class="vertex-error" role="alert" hidden></p>
+                </div>
+                <div id="update-dialog-actions" class="vertex-dialog-actions" hidden>
+                    <button type="button" id="update-dialog-back" class="vertex-button vertex-button-secondary">Späť</button>
+                    <button type="button" id="update-dialog-cancel" class="vertex-button vertex-button-secondary">Zrušiť</button>
+                    <button type="submit" id="update-dialog-submit" class="vertex-button vertex-button-primary">Aktualizovať</button>
+                </div>
+            </form>
+        </dialog>
     </div>
     <script type="module" src="./main.js"></script>
     <div class="side-panel" id="panel" style="display: none;">
