@@ -1,7 +1,9 @@
 import { MinPriorityQueue } from "https://cdn.skypack.dev/@datastructures-js/priority-queue";
+import { RBTree } from "https://cdn.jsdelivr.net/npm/bintrees@1.0.2/+esm";
 import { addpadding,shrinkpadding,addhistory, addCodeLine } from "./editor.js";
 import { saveGraphState, modifyPlaybackStepLabel, labels,assignPlaybackStepSquareLabel } from "./main.js";
 export class Path {
+  static gen_id = 0;
   constructor(start, end) {
     this.node_p = null;
     this.node_p_star = null;
@@ -14,6 +16,7 @@ export class Path {
     this.L_star = [];
     this.R = [];
     this.R_star = [];
+    this.id = Path.gen_id++;
   }
 }
 function pathKey(p) {
@@ -54,6 +57,31 @@ function getEdgesFromPath(path) {
 
   return edges;
 }
+
+function comparePath(a, b) {
+    // Handle null l
+    if (a.l == null && b.l != null) return -1;
+    if (a.l != null && b.l == null) return 1;
+
+    if (a.l != null && b.l != null) {
+        if (a.l.id < b.l.id) return -1;
+        if (a.l.id > b.l.id) return 1;
+    }
+
+    // Handle null r
+    if (a.r == null && b.r != null) return -1;
+    if (a.r != null && b.r == null) return 1;
+
+    if (a.r != null && b.r != null) {
+        if (a.r.id < b.r.id) return -1;
+        if (a.r.id > b.r.id) return 1;
+    }
+
+    return 0;
+}
+
+
+
 export class Graph {
 
 constructor(vertices, matrix = null, logger = () => {}) {
@@ -73,6 +101,13 @@ constructor(vertices, matrix = null, logger = () => {}) {
             () => new MinPriorityQueue(path => path.weight)
         )
     );
+this.p_star_list_duplicate_check = Array.from(
+    { length: vertices },
+    () => Array.from(
+        { length: vertices },
+        () => new RBTree(comparePath)
+    )
+);
     this.savedStates = [];
     if (matrix) {
         this.initializeFromMatrix(matrix);
@@ -160,6 +195,7 @@ initializeFromMatrix(matrix) {
       pathTable[i][i] = path;
 
       this.p_list[i][i].enqueue(path);
+
       this.p_star_list[i][i].enqueue(path);
   }
   for (let i = 0; i < n; i++) {
@@ -168,8 +204,10 @@ initializeFromMatrix(matrix) {
               let path = new Path(i, j);
               path.weight = edges[i][j];
               this.p_list[i][j].enqueue(path);
+
               path.l = this.p_list[i][i].front();
               path.r = this.p_list[j][j].front();
+              this.p_star_list_duplicate_check[i][j].insert({l:path.l,r:path.r})
               path.l.R.push(path);
               path.r.L.push(path);
                             pathTable[i][j] = path;
@@ -198,6 +236,7 @@ initializeFromMatrix(matrix) {
             continue;
         pathTable[i][j] = path;
         this.p_list[i][j].enqueue(path);
+
         this.p_star_list[i][j].enqueue(path);
       }
   }
@@ -222,6 +261,10 @@ initializeFromMatrix(matrix) {
 
         path.l = pathTable[i][b];
         path.r = pathTable[a][j];
+        if (!this.hasDuplicate(this.p_star_list_duplicate_check[i][j], path.l, path.r)) {
+          this.p_star_list_duplicate_check[i][j].insert({l:path.l,r:path.r})
+          console.log("no duplicate");
+        }
         if (path.l) {
             if (!path.l.R.includes(path)) path.l.R.push(path);
             if (!path.l.R_star.includes(path)) path.l.R_star.push(path);
@@ -234,6 +277,8 @@ initializeFromMatrix(matrix) {
 
       }
   }
+  console.log("rbt");
+  console.log(this.p_star_list_duplicate_check);
 this.initializeLocallyShortestPaths(dist, this.createIncomingEdges(dist));
 }
 checkUniqueShortestPaths(matrix) {
@@ -320,11 +365,16 @@ initializeLocallyShortestPaths(outgoingEdges, incomingEdges) {
 
                 newPath.l = xb;
                 newPath.r = path;
-
+                
                 const pq = this.p_list[xb.start][j];
 
-                if (!this.hasDuplicate(pq, newPath.l, newPath.r)) {
+                if (!this.hasDuplicate(this.p_star_list_duplicate_check[xb.start][j], newPath.l, newPath.r)) {
                     pq.enqueue(newPath);
+                    
+                    this.p_star_list_duplicate_check[xb.start][j].insert({
+                        l: newPath.l,
+                        r: newPath.r
+                    });
                     xb.R.push(newPath);
                     path.L.push(newPath);
                 }
@@ -350,8 +400,12 @@ initializeLocallyShortestPaths(outgoingEdges, incomingEdges) {
 
                 const pq = this.p_list[i][ay.end];
 
-                if (!this.hasDuplicate(pq, newPath.l, newPath.r)) {
+                if (!this.hasDuplicate(this.p_star_list_duplicate_check[i][ay.end], newPath.l, newPath.r)) {
                     pq.enqueue(newPath);
+                    this.p_star_list_duplicate_check[i][ay.end].insert({
+                        l: newPath.l,
+                        r: newPath.r
+                    });
                     path.R.push(newPath);
                     ay.L.push(newPath);
                 }
@@ -359,20 +413,17 @@ initializeLocallyShortestPaths(outgoingEdges, incomingEdges) {
         }
     }
 }
-hasDuplicate(queue, l, r) {
-    const items = queue.toArray();
-    console.log("paths");
-    for (const item of items) {
-        let p = item; // depending on your MinPriorityQueue
-        console.log(`l`, p.l, l);
-        console.log(`r`, p.r, r);
-        if (((p.l == null && l == null) && (p.r == null && r == null)) || (p.l && l && p.l.start === l.start && p.l.end === l.end && p.r && r && p.r.start === r.start && p.r.end === r.end)) {
-            return true;
-        }
-    }
 
-    return false;
+hasDuplicate(tree, l, r) {
+    const key = {
+        l: l,
+        r: r
+    };
+
+    return tree.find(key) !== null;
 }
+
+
 clone() {
   const newGraph = new Graph(this.V,null, this.log);
   newGraph.edgeMatrix = this.edgeMatrix?.map(row => [...row]) || null;
@@ -611,6 +662,7 @@ clone() {
 
           //addhistory(this, map);
           this.p_list[p_xy.start][p_xy.end].remove((el) => el === p_xy);
+          this.p_star_list_duplicate_check[p_xy.start][p_xy.end].remove({l:p_xy.l,r:p_xy.r})
           initialPathColor.set(pathSignature(p_xy), "red");
           assignPlaybackStepSquareLabel(
           stepLabelCount,
@@ -946,6 +998,7 @@ clone() {
         //addhistory(this,new Map([[`${u}-${u}`,"green"],[`P${u}-${u}`,"green"]]));
         addCodeLine(`r({${v+1},${u+1}}) <- {${u+1}}`);
         this.p_list[v][u].enqueue(path);
+        this.p_star_list_duplicate_check[v][u].insert({l:path.l,r:path.r});
         addedPaths.push(path);
         //addhistory(this,new Map([[`${v}-${u}`,"green"],[`P${v}-${u}`,"green"]]));
         addCodeLine(`pridaj {${v+1},${u+1}} do P(${v+1},${u+1}), L({${u+1}}), R({${v+1}})`);
@@ -1062,6 +1115,7 @@ clone() {
         //addhistory(this,new Map([[`${v}-${v}`,"green"],[`P${v}-${v}`,"green"]]));
         addCodeLine(`r({${u+1},${v+1}}) <- {${v+1}}`);
         this.p_list[u][v].enqueue(path);
+        this.p_star_list_duplicate_check[u][v].insert({l:path.l,r:path.r});
         addedPaths.push(path);
         //addhistory(this,new Map([[`${u}-${v}`,"green"],[`P${u}-${v}`,"green"]]));
         addCodeLine(`pridaj ({${u+1},${v+1}}) do P(${u+1},${v+1}), L({${v+1}}), R({${u+1}})`);
@@ -1309,9 +1363,14 @@ clone() {
             `pridávam cestu {${_parsepath(path_new_xy, path_new_xy.start + 1)}} do P(${path_new_xy.start+1},${path_new_xy.end+1}) a predĺženia cesty L({${_parsepath(path_xy, path_xy.start + 1)}}), R({${_parsepath(path_new_xb, path_new_xb.start + 1)}}) a H`,
             [path_new_xy,path_xy,path_new_xb],new Map([[pathSignature(path_new_xy), "green"], [pathSignature(path_xy), "blue"], [pathSignature(path_new_xb), "blue"]])
           );
-          if (this.hasDuplicate(this.p_list[path_new_xy.start][path_new_xy.end], path_new_xy.l, path_new_xy.r)) continue;
+          if (this.hasDuplicate(this.p_star_list_duplicate_check[path_new_xy.start][path_new_xy.end], path_new_xy.l, path_new_xy.r)) continue;
+          this.p_star_list_duplicate_check[path_new_xy.start][path_new_xy.end].insert({
+              l: path_new_xy.l,
+              r: path_new_xy.r
+          });
           console.log("enqueueing", path_new_xy);
           this.p_list[path_new_xy.start][path_new_xy.end].enqueue(path_new_xy);
+          
           discoveredFixup3Colors.set(pathSignature(path_new_xy), "green");
 
           path_xy.L.push(path_new_xy);
@@ -1374,8 +1433,12 @@ clone() {
           path_x_new_y.l = path_xy;
           path_x_new_y.r = path_a_new_y;
 
-          if (this.hasDuplicate(this.p_list[path_x_new_y.start][path_x_new_y.end], path_x_new_y.l, path_x_new_y.r)) continue;
+          if (this.hasDuplicate(this.p_star_list_duplicate_check[path_x_new_y.start][path_x_new_y.end], path_x_new_y.l, path_x_new_y.r)) continue;
           console.log("enqueueing", path_x_new_y);
+          this.p_star_list_duplicate_check[path_x_new_y.start][path_x_new_y.end].insert({
+              l: path_x_new_y.l,
+              r: path_x_new_y.r
+          });
           this.p_list[path_x_new_y.start][path_x_new_y.end].enqueue(
             path_x_new_y,
           );
