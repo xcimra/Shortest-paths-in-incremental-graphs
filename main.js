@@ -1323,6 +1323,30 @@ function addUpdateCards(vertex) {
   updateCardsApp.addUpdate(vertex);
 }
 
+function findWeightDecrease(vertex, weights) {
+  const [outgoingWeights, incomingWeights] = weights;
+
+  for (let otherVertex = 0; otherVertex < graph.V; otherVertex++) {
+    if (otherVertex === vertex) continue;
+
+    if (
+      outgoingWeights[otherVertex] !== undefined &&
+      outgoingWeights[otherVertex] < graph.edgeMatrix[vertex][otherVertex]
+    ) {
+      return { from: vertex, to: otherVertex };
+    }
+
+    if (
+      incomingWeights[otherVertex] !== undefined &&
+      incomingWeights[otherVertex] < graph.edgeMatrix[otherVertex][vertex]
+    ) {
+      return { from: otherVertex, to: vertex };
+    }
+  }
+
+  return null;
+}
+
 let pendingUpdateMode = null;
 
 function openUpdateDialog() {
@@ -1455,6 +1479,14 @@ if (!inArr || !outArr) return false;
 
 w = [inArr, outArr];
   }
+  const decreasedEdge = findWeightDecrease(v_start, w);
+  if (decreasedEdge) {
+    alert(
+      `Zníženie váhy hrany ${decreasedEdge.from + 1} → ${decreasedEdge.to + 1} nie je povolené.`
+    );
+    return false;
+  }
+
   try {
     graph.update(v_start, w);
   } catch (error) {
